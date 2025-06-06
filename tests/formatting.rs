@@ -32,18 +32,19 @@ fn test_format_list() {
 
 #[test]
 fn test_format_delete_list() {
-    let items = sample_items();
-    let (text, keyboard) = format_delete_list(&items);
+    use std::collections::HashSet;
 
-    assert_eq!(
-        text,
-        "Tap an item to delete it. Tap 'Done Deleting' when finished."
-    );
+    let items = sample_items();
+    let mut selected = HashSet::new();
+    selected.insert(1);
+    let (text, keyboard) = format_delete_list(&items, &selected);
+
+    assert_eq!(text, "Select items to delete, then tap 'Done Deleting'.");
 
     let labels: Vec<&str> = keyboard
         .inline_keyboard
         .iter()
         .map(|row| row[0].text.as_str())
         .collect();
-    assert_eq!(labels, vec!["❌ Apples", "❌ Milk", "✅ Done Deleting"]);
+    assert_eq!(labels, vec!["☑️ Apples", "❌ Milk", "✅ Done Deleting"]);
 }
