@@ -8,7 +8,7 @@ mod db;
 mod handlers;
 
 pub use db::Item;
-pub use handlers::{format_delete_list, format_list};
+pub use handlers::{format_delete_list, format_list, parse_item_line};
 
 use handlers::{
     add_items_from_text, archive, callback_handler, enter_delete_mode, help, nuke_list, send_list,

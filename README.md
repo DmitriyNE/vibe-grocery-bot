@@ -31,6 +31,7 @@ Set these environment variables before running:
 
 - `TELOXIDE_TOKEN` – Telegram bot token from @BotFather
 - `DB_URL` – optional SQLite connection string (defaults to `sqlite:shopping.db`)
+- `RUST_LOG` – optional logging level (e.g. `info` or `debug`)
 
 The database file is created automatically if needed. Embedded SQLx migrations in the `migrations/` directory are executed on startup.
 
