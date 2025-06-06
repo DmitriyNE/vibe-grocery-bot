@@ -1,6 +1,7 @@
 use anyhow::Result;
 use dotenvy::dotenv;
 use sqlx::{sqlite::SqlitePoolOptions, Pool, Sqlite};
+use std::env; // Import the standard library's env module
 use teloxide::{
     prelude::*,
     requests::Requester,
@@ -14,7 +15,7 @@ use teloxide::{
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Load .env file if it exists
+    // Load .env file if it exists (for local development)
     dotenv().ok();
 
     // Initialize tracing subscriber for logging
@@ -27,15 +28,27 @@ async fn main() -> Result<()> {
     let bot = Bot::from_env();
 
     // --- SQLite Pool ---
+    // Read the database URL from the environment, with a fallback for local dev.
+    let mut db_url = env::var("DB_URL").unwrap_or_else(|_| "sqlite:shopping.db".to_string());
+
+    // --- THIS IS THE FIX ---
+    // Ensure the connection string has the 'create if not exists' flag.
+    // This is crucial for the first run on a new volume, as it tells SQLite
+    // to create the database file if it's missing.
+    if db_url.starts_with("sqlite:") && !db_url.contains("mode=") {
+        db_url.push_str("?mode=rwc");
+    }
+
+    tracing::info!("Connecting to database at: {}", &db_url);
+
     let db: Pool<Sqlite> = SqlitePoolOptions::new()
         .max_connections(5)
-        .connect("sqlite:shopping.db?mode=rwc")
+        .connect(&db_url)
         .await?;
 
     tracing::info!("Database connection successful.");
 
     // --- Database Schema ---
-    // Create the 'items' table for the shopping list.
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS items(
             id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,7 +60,6 @@ async fn main() -> Result<()> {
     .execute(&db)
     .await?;
 
-    // Create the 'chat_state' table to track the last list message per chat.
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS chat_state(
             chat_id                 INTEGER PRIMARY KEY,
@@ -72,7 +84,7 @@ async fn main() -> Result<()> {
         List,
         #[command(description = "finalize and archive the current list, starting a new one.")]
         Archive,
-        #[command(description = "enter mode to delete items from the list.")]
+        #[command(description = "show a temporary panel to delete items from the list.")]
         Delete,
         #[command(description = "completely delete the current list.")]
         Nuke,
@@ -120,7 +132,6 @@ struct Item {
     done: bool,
 }
 
-/// Adds a single item to the database.
 async fn add_item(db: &Pool<Sqlite>, chat_id: ChatId, text: &str) -> Result<()> {
     sqlx::query("INSERT INTO items (chat_id, text) VALUES (?, ?)")
         .bind(chat_id.0)
@@ -130,7 +141,6 @@ async fn add_item(db: &Pool<Sqlite>, chat_id: ChatId, text: &str) -> Result<()> 
     Ok(())
 }
 
-/// Retrieves all items for a given chat.
 async fn list_items(db: &Pool<Sqlite>, chat_id: ChatId) -> Result<Vec<Item>> {
     sqlx::query_as("SELECT id, text, done FROM items WHERE chat_id = ? ORDER BY id")
         .bind(chat_id.0)
@@ -139,7 +149,6 @@ async fn list_items(db: &Pool<Sqlite>, chat_id: ChatId) -> Result<Vec<Item>> {
         .map_err(Into::into)
 }
 
-/// Toggles the 'done' status of an item.
 async fn toggle_item(db: &Pool<Sqlite>, id: i64) -> Result<()> {
     sqlx::query("UPDATE items SET done = NOT done WHERE id = ?")
         .bind(id)
@@ -148,7 +157,6 @@ async fn toggle_item(db: &Pool<Sqlite>, id: i64) -> Result<()> {
     Ok(())
 }
 
-/// Deletes a single item from the database by its ID.
 async fn delete_item(db: &Pool<Sqlite>, id: i64) -> Result<()> {
     sqlx::query("DELETE FROM items WHERE id = ?")
         .bind(id)
@@ -157,7 +165,6 @@ async fn delete_item(db: &Pool<Sqlite>, id: i64) -> Result<()> {
     Ok(())
 }
 
-/// Deletes all items for a given chat, effectively clearing the active list.
 async fn delete_all_items(db: &Pool<Sqlite>, chat_id: ChatId) -> Result<()> {
     sqlx::query("DELETE FROM items WHERE chat_id = ?")
         .bind(chat_id.0)
@@ -166,13 +173,11 @@ async fn delete_all_items(db: &Pool<Sqlite>, chat_id: ChatId) -> Result<()> {
     Ok(())
 }
 
-// Struct to fetch the last message ID from the chat_state table.
 #[derive(sqlx::FromRow)]
 struct ChatState {
     last_list_message_id: i32,
 }
 
-/// Retrieves the ID of the last list message sent to a chat.
 async fn get_last_list_message_id(db: &Pool<Sqlite>, chat_id: ChatId) -> Result<Option<i32>> {
     let result = sqlx::query_as::<_, ChatState>(
         "SELECT last_list_message_id FROM chat_state WHERE chat_id = ?",
@@ -183,7 +188,6 @@ async fn get_last_list_message_id(db: &Pool<Sqlite>, chat_id: ChatId) -> Result<
     Ok(result.map(|r| r.last_list_message_id))
 }
 
-/// Stores the ID of the latest list message for a chat.
 async fn update_last_list_message_id(
     db: &Pool<Sqlite>,
     chat_id: ChatId,
@@ -200,7 +204,6 @@ async fn update_last_list_message_id(
     Ok(())
 }
 
-/// Removes the tracked message ID for a chat, preventing an archived message from being deleted.
 async fn clear_last_list_message_id(db: &Pool<Sqlite>, chat_id: ChatId) -> Result<()> {
     sqlx::query("DELETE FROM chat_state WHERE chat_id = ?")
         .bind(chat_id.0)
@@ -213,7 +216,6 @@ async fn clear_last_list_message_id(db: &Pool<Sqlite>, chat_id: ChatId) -> Resul
 // Bot Handlers & Helpers
 // ──────────────────────────────────────────────────────────────
 
-/// Sends the help message.
 async fn help(bot: Bot, msg: Message) -> Result<()> {
     bot.send_message(
         msg.chat.id,
@@ -230,7 +232,6 @@ async fn help(bot: Bot, msg: Message) -> Result<()> {
     Ok(())
 }
 
-/// Generates the text and keyboard for the normal shopping list view.
 fn format_list(items: &[Item]) -> (String, InlineKeyboardMarkup) {
     let mut text = String::new();
     let mut keyboard_buttons = Vec::new();
@@ -252,7 +253,6 @@ fn format_list(items: &[Item]) -> (String, InlineKeyboardMarkup) {
     (text, InlineKeyboardMarkup::new(keyboard_buttons))
 }
 
-/// Generates the text and keyboard for the delete mode view.
 fn format_delete_list(items: &[Item]) -> (String, InlineKeyboardMarkup) {
     let text = "Tap an item to delete it. Tap 'Done' when finished.".to_string();
     let mut keyboard_buttons = Vec::new();
@@ -266,7 +266,6 @@ fn format_delete_list(items: &[Item]) -> (String, InlineKeyboardMarkup) {
         )]);
     }
 
-    // Add the "Done" button to exit delete mode
     keyboard_buttons.push(vec![InlineKeyboardButton::callback(
         "✅ Done Deleting",
         "delete_done",
@@ -275,17 +274,14 @@ fn format_delete_list(items: &[Item]) -> (String, InlineKeyboardMarkup) {
     (text, InlineKeyboardMarkup::new(keyboard_buttons))
 }
 
-/// Parses a message, adding each line as a separate item. Cleans up pasted archived lists.
 async fn add_items_from_text(bot: Bot, msg: Message, db: Pool<Sqlite>) -> Result<()> {
     if let Some(text) = msg.text() {
         let mut items_added_count = 0;
         for line in text.lines() {
-            // Ignore the header of a pasted archived list
             if line.trim() == "--- Archived List ---" {
                 continue;
             }
 
-            // Remove checkmark icons and trim whitespace
             let cleaned_line = line.trim_start_matches(['✅', '🛒']).trim();
 
             if !cleaned_line.is_empty() {
@@ -306,9 +302,7 @@ async fn add_items_from_text(bot: Bot, msg: Message, db: Pool<Sqlite>) -> Result
     Ok(())
 }
 
-/// Sends a new message with the shopping list, deleting the previous one.
 async fn send_list(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()> {
-    // 1. Delete the old list message, if one exists.
     if let Some(message_id) = get_last_list_message_id(db, chat_id).await? {
         let _ = bot.delete_message(chat_id, MessageId(message_id)).await;
     }
@@ -328,19 +322,16 @@ async fn send_list(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()> {
 
     let (text, keyboard) = format_list(&items);
 
-    // 2. Send the new list message.
     let sent_msg = bot
         .send_message(chat_id, text)
         .reply_markup(keyboard)
         .await?;
 
-    // 3. Store the ID of the new message.
     update_last_list_message_id(db, chat_id, sent_msg.id).await?;
 
     Ok(())
 }
 
-/// Atomically edits an existing message to update the list.
 async fn update_list_message(
     bot: &Bot,
     chat_id: ChatId,
@@ -369,7 +360,6 @@ async fn update_list_message(
     Ok(())
 }
 
-/// Archives the entire current list, making it static and starting a new one.
 async fn archive(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()> {
     let last_message_id = match get_last_list_message_id(db, chat_id).await? {
         Some(id) => id,
@@ -406,17 +396,13 @@ async fn archive(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()> {
     Ok(())
 }
 
-/// Sends a temporary, user-specific message with delete buttons.
 async fn enter_delete_mode(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Result<()> {
-    // Immediately delete the user's /delete command to keep the chat clean.
     let _ = bot.delete_message(msg.chat.id, msg.id).await;
 
-    // Check if there is an active list to edit.
     if get_last_list_message_id(db, msg.chat.id).await?.is_none() {
         let sent_msg = bot
             .send_message(msg.chat.id, "There is no active list to edit.")
             .await?;
-        // Delete this notification after a few seconds.
         tokio::spawn(async move {
             tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
             let _ = bot.delete_message(sent_msg.chat.id, sent_msg.id).await;
@@ -426,12 +412,11 @@ async fn enter_delete_mode(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Result<
 
     let items = list_items(db, msg.chat.id).await?;
     if items.is_empty() {
-        return Ok(()); // No items to delete, so do nothing.
+        return Ok(());
     }
 
     let (text, keyboard) = format_delete_list(&items);
 
-    // Send a new, temporary message with the delete panel.
     bot.send_message(msg.chat.id, text)
         .reply_markup(keyboard)
         .await?;
@@ -439,25 +424,18 @@ async fn enter_delete_mode(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Result<
     Ok(())
 }
 
-/// Completely deletes the current active list and its message.
 async fn nuke_list(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Result<()> {
-    // 1. Delete the user's command message.
     let _ = bot.delete_message(msg.chat.id, msg.id).await;
 
-    // 2. Delete the main list message, if it exists.
     if let Some(list_message_id) = get_last_list_message_id(db, msg.chat.id).await? {
         let _ = bot
             .delete_message(msg.chat.id, MessageId(list_message_id))
             .await;
     }
 
-    // 3. Delete all items for this chat from the database.
     delete_all_items(db, msg.chat.id).await?;
-
-    // 4. Clear the chat state.
     clear_last_list_message_id(db, msg.chat.id).await?;
 
-    // 5. Send a confirmation message that auto-deletes.
     let confirmation = bot
         .send_message(msg.chat.id, "The active list has been nuked.")
         .await?;
@@ -471,27 +449,20 @@ async fn nuke_list(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Result<()> {
     Ok(())
 }
 
-/// Handles all callback queries (button presses).
 async fn callback_handler(bot: Bot, q: CallbackQuery, db: Pool<Sqlite>) -> Result<()> {
     if let (Some(data), Some(msg)) = (q.data, q.message) {
-        // --- Delete Mode Logic ---
         if let Some(id_str) = data.strip_prefix("delete_") {
             if id_str == "done" {
-                // The user is done, so delete the temporary delete panel.
                 let _ = bot.delete_message(msg.chat.id, msg.id).await;
             } else if let Ok(id) = id_str.parse::<i64>() {
-                // 1. Delete the item from the database.
                 delete_item(&db, id).await?;
 
-                // 2. Refresh the main shared list.
                 if let Some(main_list_id) = get_last_list_message_id(&db, msg.chat.id).await? {
                     update_list_message(&bot, msg.chat.id, MessageId(main_list_id), &db).await?;
                 }
 
-                // 3. Refresh the temporary delete panel with the remaining items.
                 let items = list_items(&db, msg.chat.id).await?;
                 if items.is_empty() {
-                    // If no items are left, just delete the panel.
                     let _ = bot.delete_message(msg.chat.id, msg.id).await;
                 } else {
                     let (text, keyboard) = format_delete_list(&items);
@@ -501,10 +472,8 @@ async fn callback_handler(bot: Bot, q: CallbackQuery, db: Pool<Sqlite>) -> Resul
                         .await;
                 }
             }
-        // --- Normal Mode (Toggle) Logic ---
         } else if let Ok(id) = data.parse::<i64>() {
             toggle_item(&db, id).await?;
-            // Update the main list message directly.
             update_list_message(&bot, msg.chat.id, msg.id, &db).await?;
         }
     }
