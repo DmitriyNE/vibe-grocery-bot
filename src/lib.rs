@@ -201,12 +201,14 @@ struct DeleteSessionRow {
     selected: String,
     notice_chat_id: Option<i64>,
     notice_message_id: Option<i32>,
+    dm_message_id: Option<i32>,
 }
 
 struct DeleteSession {
     chat_id: ChatId,
     selected: HashSet<i64>,
     notice: Option<(ChatId, MessageId)>,
+    dm_message_id: Option<MessageId>,
 }
 
 fn parse_selected(s: &str) -> HashSet<i64> {
@@ -225,7 +227,7 @@ fn join_selected(set: &HashSet<i64>) -> String {
 async fn init_delete_session(db: &Pool<Sqlite>, user_id: i64, chat_id: ChatId) -> Result<()> {
     sqlx::query(
         "INSERT INTO delete_session (user_id, chat_id, selected) VALUES (?, ?, '') \
-         ON CONFLICT(user_id) DO UPDATE SET chat_id=excluded.chat_id, selected='', notice_chat_id=NULL, notice_message_id=NULL",
+         ON CONFLICT(user_id) DO UPDATE SET chat_id=excluded.chat_id, selected='', notice_chat_id=NULL, notice_message_id=NULL, dm_message_id=NULL",
     )
     .bind(user_id)
     .bind(chat_id.0)
@@ -265,9 +267,22 @@ async fn set_delete_notice(
     Ok(())
 }
 
+async fn set_delete_dm_message(
+    db: &Pool<Sqlite>,
+    user_id: i64,
+    message_id: MessageId,
+) -> Result<()> {
+    sqlx::query("UPDATE delete_session SET dm_message_id = ? WHERE user_id = ?")
+        .bind(message_id.0)
+        .bind(user_id)
+        .execute(db)
+        .await?;
+    Ok(())
+}
+
 async fn get_delete_session(db: &Pool<Sqlite>, user_id: i64) -> Result<Option<DeleteSession>> {
     if let Some(row) = sqlx::query_as::<_, DeleteSessionRow>(
-        "SELECT chat_id, selected, notice_chat_id, notice_message_id FROM delete_session WHERE user_id = ?",
+        "SELECT chat_id, selected, notice_chat_id, notice_message_id, dm_message_id FROM delete_session WHERE user_id = ?",
     )
     .bind(user_id)
     .fetch_optional(db)
@@ -281,6 +296,7 @@ async fn get_delete_session(db: &Pool<Sqlite>, user_id: i64) -> Result<Option<De
             chat_id: ChatId(row.chat_id),
             selected: parse_selected(&row.selected),
             notice,
+            dm_message_id: row.dm_message_id.map(MessageId),
         }))
     } else {
         Ok(None)
@@ -506,6 +522,15 @@ async fn enter_delete_mode(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Result<
         None => return Ok(()),
     };
 
+    if let Some(prev) = get_delete_session(db, user.id.0 as i64).await? {
+        if let Some((c, m)) = prev.notice {
+            let _ = bot.delete_message(c, m).await;
+        }
+        if let Some(dm) = prev.dm_message_id {
+            let _ = bot.delete_message(ChatId(user.id.0 as i64), dm).await;
+        }
+    }
+
     let items = list_items(db, msg.chat.id).await?;
     if items.is_empty() {
         return Ok(());
@@ -527,7 +552,8 @@ async fn enter_delete_mode(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Result<
         .reply_markup(keyboard)
         .await
     {
-        Ok(_) => {
+        Ok(dm_msg) => {
+            set_delete_dm_message(db, user.id.0 as i64, dm_msg.id).await?;
             if !msg.chat.is_private() {
                 let info = bot
                     .send_message(
@@ -588,6 +614,9 @@ async fn callback_handler(bot: Bot, q: CallbackQuery, db: Pool<Sqlite>) -> Resul
 
             if id_str == "done" {
                 if let Some(session) = get_delete_session(&db, user_id).await? {
+                    if session.dm_message_id.map(|m| m.0) != Some(msg.id.0) {
+                        return Ok(());
+                    }
                     for id in &session.selected {
                         delete_item(&db, *id).await?;
                     }
@@ -609,6 +638,9 @@ async fn callback_handler(bot: Bot, q: CallbackQuery, db: Pool<Sqlite>) -> Resul
                 let _ = bot.delete_message(msg.chat.id, msg.id).await;
             } else if let Ok(id) = id_str.parse::<i64>() {
                 if let Some(mut session) = get_delete_session(&db, user_id).await? {
+                    if session.dm_message_id.map(|m| m.0) != Some(msg.id.0) {
+                        return Ok(());
+                    }
                     if session.selected.contains(&id) {
                         session.selected.remove(&id);
                     } else {
@@ -676,7 +708,8 @@ mod tests {
                 chat_id INTEGER NOT NULL,
                 selected TEXT NOT NULL DEFAULT '',
                 notice_chat_id INTEGER,
-                notice_message_id INTEGER
+                notice_message_id INTEGER,
+                dm_message_id INTEGER
             )",
         )
         .execute(&db)
