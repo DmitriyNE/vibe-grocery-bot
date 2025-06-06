@@ -47,38 +47,10 @@ pub async fn run() -> Result<()> {
 
     tracing::info!("Database connection successful.");
 
-    // --- Database Schema ---
-    sqlx::query(
-        "CREATE TABLE IF NOT EXISTS items(
-            id        INTEGER PRIMARY KEY AUTOINCREMENT,
-            chat_id   INTEGER NOT NULL,
-            text      TEXT    NOT NULL,
-            done      BOOLEAN NOT NULL DEFAULT 0
-        )",
-    )
-    .execute(&db)
-    .await?;
-
-    sqlx::query(
-        "CREATE TABLE IF NOT EXISTS chat_state(
-            chat_id                 INTEGER PRIMARY KEY,
-            last_list_message_id    INTEGER
-        )",
-    )
-    .execute(&db)
-    .await?;
-
-    sqlx::query(
-        "CREATE TABLE IF NOT EXISTS delete_session(
-            user_id INTEGER PRIMARY KEY,
-            chat_id INTEGER NOT NULL,
-            selected TEXT NOT NULL DEFAULT '',
-            notice_chat_id INTEGER,
-            notice_message_id INTEGER
-        )",
-    )
-    .execute(&db)
-    .await?;
+    // --- Run Migrations ---
+    // Use embedded SQLx migrations so the database schema stays up to date
+    // without requiring manual setup.
+    sqlx::migrate!("./migrations").run(&db).await?;
 
     // --- Command Enum ---
     #[derive(BotCommands, Clone)]
