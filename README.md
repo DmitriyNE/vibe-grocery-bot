@@ -1,29 +1,17 @@
 # Vibe Grocery Bot
 
-**WARNING: THIS ENTIRE PROJECT WAS VIBECODED WITH ONLY HOMEOPATHIC HUMAN EDITS!**
+Vibe Grocery Bot is a small Telegram bot for managing a shared shopping list. It was vibecoded mostly automatically, so treat it as a fun hack.
 
-This is a small Telegram bot for keeping a collaborative grocery list. The code came into being through vibes and automated tooling rather than meticulous engineering, so expect quirks.
+Each chat—whether a group or a private conversation—gets its own independent list.
 
-## Development
+## Usage
 
-You'll need a recent [Rust toolchain](https://www.rust-lang.org/tools/install). The CI configuration uses `cargo fmt`, `cargo clippy` and `cargo test` so running them locally is a good idea too.
+Send any message to the bot. Every non-empty line becomes an item. The bot responds with a list message containing checkbox buttons so you can mark things bought. The main commands are:
 
-All project dependencies, including `sqlx` and `teloxide`, are fetched automatically by Cargo when building.
-
-The bot now manages its database schema through embedded SQLx migrations. When
-
-the application starts it will automatically run any migrations found in the
-`migrations/` directory.
-
-## Configuration
-
-The bot reads its settings from environment variables:
-
-* `TELOXIDE_TOKEN` - your Telegram bot token.
-* `DB_URL` - SQLite connection string (defaults to `sqlite:shopping.db`).
-  The application ensures the database file is created if it does not exist.
-
-Have fun and vibe responsibly!
+- `/list` – show the list again
+- `/archive` – archive the current list and start a new one
+- `/delete` – select items to remove
+- `/nuke` – wipe the list completely
 
 ## Installation
 
@@ -34,23 +22,22 @@ Have fun and vibe responsibly!
    cargo build --release
    ```
 
-   You can also build a container image using the provided `Dockerfile`:
+   Or build a container image:
 
    ```bash
    docker build -t shopbot .
    ```
 
-## Usage
+## Configuration
 
-Set the following environment variables before running the bot:
+Set these environment variables before running:
 
-| Variable         | Description                                  |
-| ---------------- | -------------------------------------------- |
-| `TELOXIDE_TOKEN` | Telegram bot token obtained from @BotFather. |
-| `DB_URL`         | (Optional) Database connection string.       |
+- `TELOXIDE_TOKEN` – Telegram bot token from @BotFather
+- `DB_URL` – optional SQLite connection string (defaults to `sqlite:shopping.db`)
 
-If `DB_URL` is not provided the bot defaults to a local SQLite
-database in the current directory.
+The database file is created automatically if needed. Any migrations in `migrations/` run on startup.
+
+## Running
 
 Launch the bot with:
 
@@ -58,32 +45,9 @@ Launch the bot with:
 cargo run --release
 ```
 
-On first start it will create the database (if needed) and run any
-migrations found in `migrations/` automatically.
-
-## Using the Bot
-
-Send any message to the bot and each line becomes a shopping list item.
-The bot replies with an interactive message where every item has its own
-checkbox button. Tap a button to mark something as bought or to uncheck it.
-
-Available commands:
-
-- `/list` &mdash; show the current list again
-- `/archive` &mdash; finalize and archive the list, starting a new one
-- `/delete` &mdash; open a panel to select and remove items
-- `/nuke` &mdash; completely wipe the current list
-
-The bot keeps one active list per chat or group. Items and their state are
-stored separately for each chat, so you can use the bot in group
-conversations or personal ones without interference.
-
 ## Deployment on Fly.io
 
-The repository includes `fly.toml` so you can deploy the bot to
-[Fly.io](https://fly.io/). Edit this file to set your own Fly app name
-before the first deploy. After installing the Fly CLI and logging in,
-run the following commands:
+The repository includes `fly.toml` for deployment on [Fly.io](https://fly.io/). Edit the `app` name inside that file, then after installing the Fly CLI run:
 
 ```bash
 fly volumes create shopbot_db --size 1
@@ -91,5 +55,16 @@ fly secrets set TELOXIDE_TOKEN=YOUR_TOKEN
 fly deploy
 ```
 
-The volume stores the SQLite database under `/data` as configured in
-`fly.toml`. Subsequent deployments will reuse the same data.
+The volume stores the SQLite database under `/data`.
+
+## Development
+
+Dependencies like `teloxide` and `sqlx` are fetched by Cargo. Before committing, run:
+
+```bash
+cargo fmt --all -- --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test --all --no-fail-fast
+```
+
+Have fun and vibe responsibly!
