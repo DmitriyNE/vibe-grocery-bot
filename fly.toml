@@ -1,0 +1,33 @@
+# fly.toml app configuration file generated for shopping-lists-without-any-geese-bot on 2025-06-06T16:58:51+04:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'shopping-lists-without-any-geese-bot'
+primary_region = 'bom'
+
+[build]
+  dockerfile = '.'
+
+[env]
+  RUST_LOG = 'info'
+
+[[mounts]]
+  source = 'shopbot_db'
+  destination = '/data'
+
+[[services]]
+  protocol = 'tcp'
+  internal_port = 8080
+
+  [[services.ports]]
+    port = 443
+
+  [[services.ports]]
+    port = 80
+    handlers = ['http_redirect']
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
