@@ -72,6 +72,8 @@ async fn main() -> Result<()> {
         List,
         #[command(description = "finalize and archive the current list, starting a new one.")]
         Archive,
+        #[command(description = "enter mode to delete items from the list.")]
+        Delete,
     }
 
     // --- Handler Setup ---
@@ -85,6 +87,7 @@ async fn main() -> Result<()> {
                             Command::Start | Command::Help => help(bot, msg).await?,
                             Command::List => send_list(bot, msg.chat.id, &db).await?,
                             Command::Archive => archive(bot, msg.chat.id, &db).await?,
+                            Command::Delete => enter_delete_mode(bot, msg, &db).await?,
                         }
                         Ok(())
                     },
@@ -136,6 +139,15 @@ async fn list_items(db: &Pool<Sqlite>, chat_id: ChatId) -> Result<Vec<Item>> {
 /// Toggles the 'done' status of an item.
 async fn toggle_item(db: &Pool<Sqlite>, id: i64) -> Result<()> {
     sqlx::query("UPDATE items SET done = NOT done WHERE id = ?")
+        .bind(id)
+        .execute(db)
+        .await?;
+    Ok(())
+}
+
+/// Deletes a single item from the database by its ID.
+async fn delete_item(db: &Pool<Sqlite>, id: i64) -> Result<()> {
+    sqlx::query("DELETE FROM items WHERE id = ?")
         .bind(id)
         .execute(db)
         .await?;
@@ -206,14 +218,15 @@ async fn help(bot: Bot, msg: Message) -> Result<()> {
          You can tap the checkbox button next to an item to mark it as bought.\n\n\
          <b>Commands:</b>\n\
          /list - Show the current shopping list.\n\
-         /archive - Finalize and archive the current list, starting a new one.",
+         /archive - Finalize and archive the current list, starting a new one.\n\
+         /delete - Enter mode to delete items from the list.",
     )
     .parse_mode(teloxide::types::ParseMode::Html)
     .await?;
     Ok(())
 }
 
-/// Generates the text and keyboard for the shopping list.
+/// Generates the text and keyboard for the normal shopping list view.
 fn format_list(items: &[Item]) -> (String, InlineKeyboardMarkup) {
     let mut text = String::new();
     let mut keyboard_buttons = Vec::new();
@@ -231,6 +244,29 @@ fn format_list(items: &[Item]) -> (String, InlineKeyboardMarkup) {
             item.id.to_string(),
         )]);
     }
+
+    (text, InlineKeyboardMarkup::new(keyboard_buttons))
+}
+
+/// Generates the text and keyboard for the delete mode view.
+fn format_delete_list(items: &[Item]) -> (String, InlineKeyboardMarkup) {
+    let text = "Select items to delete:".to_string();
+    let mut keyboard_buttons = Vec::new();
+
+    for item in items {
+        let button_text = format!("❌ {}", item.text);
+        let callback_data = format!("delete_{}", item.id);
+        keyboard_buttons.push(vec![InlineKeyboardButton::callback(
+            button_text,
+            callback_data,
+        )]);
+    }
+
+    // Add the "Done" button to exit delete mode
+    keyboard_buttons.push(vec![InlineKeyboardButton::callback(
+        "✅ Done Deleting",
+        "delete_done",
+    )]);
 
     (text, InlineKeyboardMarkup::new(keyboard_buttons))
 }
@@ -294,10 +330,9 @@ async fn send_list(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()> {
 }
 
 /// Atomically edits an existing message to update the list.
-async fn update_list_message(bot: Bot, msg: &Message, db: &Pool<Sqlite>) -> Result<()> {
+async fn update_list_message(bot: &Bot, msg: &Message, db: &Pool<Sqlite>) -> Result<()> {
     let items = list_items(db, msg.chat.id).await?;
 
-    // This block handles the case where the list becomes empty.
     if items.is_empty() {
         let _ = bot
             .edit_message_text(msg.chat.id, msg.id, "List is now empty!")
@@ -310,8 +345,6 @@ async fn update_list_message(bot: Bot, msg: &Message, db: &Pool<Sqlite>) -> Resu
 
     let (text, keyboard) = format_list(&items);
 
-    // Atomically edit the message text and keyboard in a single API call.
-    // This prevents the keyboard from flickering.
     let _ = bot
         .edit_message_text(msg.chat.id, msg.id, text)
         .reply_markup(keyboard)
@@ -322,7 +355,6 @@ async fn update_list_message(bot: Bot, msg: &Message, db: &Pool<Sqlite>) -> Resu
 
 /// Archives the entire current list, making it static and starting a new one.
 async fn archive(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()> {
-    // 1. Get the message ID of the list we are archiving.
     let last_message_id = match get_last_list_message_id(db, chat_id).await? {
         Some(id) => id,
         None => {
@@ -332,7 +364,6 @@ async fn archive(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()> {
         }
     };
 
-    // 2. Get the current items to format the final message.
     let items = list_items(db, chat_id).await?;
     if items.is_empty() {
         bot.send_message(chat_id, "There is no active list to archive.")
@@ -343,7 +374,6 @@ async fn archive(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()> {
     let (final_text, _) = format_list(&items);
     let archived_text = format!("--- Archived List ---\n{}", final_text);
 
-    // 3. Edit the message to be static (final text, no buttons).
     let _ = bot
         .edit_message_text(chat_id, MessageId(last_message_id), archived_text)
         .reply_markup(InlineKeyboardMarkup::new(
@@ -351,25 +381,75 @@ async fn archive(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()> {
         ))
         .await;
 
-    // 4. Delete all items for this chat from the database, starting a clean slate.
     delete_all_items(db, chat_id).await?;
-
-    // 5. Clear the chat state so this archived message isn't deleted later.
     clear_last_list_message_id(db, chat_id).await?;
 
-    // 6. Notify the user.
     bot.send_message(chat_id, "List archived! Send a message to start a new one.")
         .await?;
 
     Ok(())
 }
 
-/// Handles callback queries from inline button presses.
+/// Switches the active list message into "delete mode".
+async fn enter_delete_mode(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Result<()> {
+    // Clean up the command message
+    let _ = bot.delete_message(msg.chat.id, msg.id).await;
+
+    let last_message_id = match get_last_list_message_id(db, msg.chat.id).await? {
+        Some(id) => id,
+        None => {
+            bot.send_message(msg.chat.id, "There is no active list to edit.")
+                .await?;
+            return Ok(());
+        }
+    };
+
+    let items = list_items(db, msg.chat.id).await?;
+    if items.is_empty() {
+        bot.send_message(msg.chat.id, "List is already empty.")
+            .await?;
+        return Ok(());
+    }
+
+    let (text, keyboard) = format_delete_list(&items);
+
+    let _ = bot
+        .edit_message_text(msg.chat.id, MessageId(last_message_id), text)
+        .reply_markup(keyboard)
+        .await;
+
+    Ok(())
+}
+
+/// Handles all callback queries (button presses).
 async fn callback_handler(bot: Bot, q: CallbackQuery, db: Pool<Sqlite>) -> Result<()> {
     if let (Some(data), Some(msg)) = (q.data, q.message) {
-        if let Ok(id) = data.parse::<i64>() {
+        // --- Delete Mode Logic ---
+        if let Some(id_str) = data.strip_prefix("delete_") {
+            if id_str == "done" {
+                // Exit delete mode by switching back to the normal list view.
+                update_list_message(&bot, &msg, &db).await?;
+            } else if let Ok(id) = id_str.parse::<i64>() {
+                // Delete the selected item.
+                delete_item(&db, id).await?;
+
+                // Refresh the delete mode message with the remaining items.
+                let items = list_items(&db, msg.chat.id).await?;
+                if items.is_empty() {
+                    // If the list is now empty, switch back to the normal view.
+                    update_list_message(&bot, &msg, &db).await?;
+                } else {
+                    let (text, keyboard) = format_delete_list(&items);
+                    let _ = bot
+                        .edit_message_text(msg.chat.id, msg.id, text)
+                        .reply_markup(keyboard)
+                        .await;
+                }
+            }
+        // --- Normal Mode (Toggle) Logic ---
+        } else if let Ok(id) = data.parse::<i64>() {
             toggle_item(&db, id).await?;
-            update_list_message(bot.clone(), &msg, &db).await?;
+            update_list_message(&bot, &msg, &db).await?;
         }
     }
 
