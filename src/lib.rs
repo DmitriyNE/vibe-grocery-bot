@@ -481,3 +481,88 @@ async fn callback_handler(bot: Bot, q: CallbackQuery, db: Pool<Sqlite>) -> Resul
     bot.answer_callback_query(q.id).await?;
     Ok(())
 }
+
+// ──────────────────────────────────────────────────────────────
+// Tests
+// ──────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    async fn init_db() -> Pool<Sqlite> {
+        let db = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+
+        sqlx::query(
+            "CREATE TABLE items(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chat_id INTEGER NOT NULL,
+                text TEXT NOT NULL,
+                done BOOLEAN NOT NULL DEFAULT 0
+            )",
+        )
+        .execute(&db)
+        .await
+        .unwrap();
+
+        sqlx::query(
+            "CREATE TABLE chat_state(
+                chat_id INTEGER PRIMARY KEY,
+                last_list_message_id INTEGER
+            )",
+        )
+        .execute(&db)
+        .await
+        .unwrap();
+
+        db
+    }
+
+    #[tokio::test]
+    async fn basic_item_flow() -> Result<()> {
+        let db = init_db().await;
+        let chat = ChatId(42);
+
+        add_item(&db, chat, "Apples").await?;
+        add_item(&db, chat, "Milk").await?;
+
+        let mut items = list_items(&db, chat).await?;
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].text, "Apples");
+        assert!(!items[0].done);
+
+        toggle_item(&db, items[0].id).await?;
+        items = list_items(&db, chat).await?;
+        assert!(items[0].done);
+
+        delete_item(&db, items[1].id).await?;
+        items = list_items(&db, chat).await?;
+        assert_eq!(items.len(), 1);
+
+        delete_all_items(&db, chat).await?;
+        items = list_items(&db, chat).await?;
+        assert!(items.is_empty());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn last_message_id_roundtrip() -> Result<()> {
+        let db = init_db().await;
+        let chat = ChatId(1);
+
+        assert!(get_last_list_message_id(&db, chat).await?.is_none());
+
+        update_last_list_message_id(&db, chat, MessageId(99)).await?;
+        assert_eq!(get_last_list_message_id(&db, chat).await?, Some(99));
+
+        clear_last_list_message_id(&db, chat).await?;
+        assert!(get_last_list_message_id(&db, chat).await?.is_none());
+
+        Ok(())
+    }
+}
