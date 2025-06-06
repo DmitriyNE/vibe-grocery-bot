@@ -1,11 +1,11 @@
 use anyhow::Result;
 use dotenvy::dotenv;
-use sqlx::{sqlite::SqlitePoolOptions, Pool, Sqlite};
+use sqlx::{sqlite::SqlitePoolOptions, Pool, Row, Sqlite};
 use std::env; // Import the standard library's env module
 use teloxide::{
     prelude::*,
     requests::Requester,
-    types::{InlineKeyboardButton, InlineKeyboardMarkup, MessageId},
+    types::{InlineKeyboardButton, InlineKeyboardMarkup, MessageId, UserId},
     utils::command::BotCommands,
 };
 
@@ -170,6 +170,14 @@ async fn delete_all_items(db: &Pool<Sqlite>, chat_id: ChatId) -> Result<()> {
         .execute(db)
         .await?;
     Ok(())
+}
+
+async fn get_item_chat_id(db: &Pool<Sqlite>, id: i64) -> Result<Option<i64>> {
+    let row = sqlx::query("SELECT chat_id FROM items WHERE id = ?")
+        .bind(id)
+        .fetch_optional(db)
+        .await?;
+    Ok(row.map(|r| r.get::<i64, _>(0)))
 }
 
 #[derive(sqlx::FromRow)]
@@ -410,16 +418,58 @@ async fn enter_delete_mode(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Result<
         return Ok(());
     }
 
+    let user = match msg.from() {
+        Some(u) => u,
+        None => return Ok(()),
+    };
+
     let items = list_items(db, msg.chat.id).await?;
     if items.is_empty() {
         return Ok(());
     }
 
-    let (text, keyboard) = format_delete_list(&items);
+    let (base_text, keyboard) = format_delete_list(&items);
 
-    bot.send_message(msg.chat.id, text)
+    let chat_name = msg
+        .chat
+        .title()
+        .map(ToString::to_string)
+        .unwrap_or_else(|| "your list".to_string());
+    let dm_text = format!("Deleting items from {}.\n\n{}", chat_name, base_text);
+
+    match bot
+        .send_message(UserId(user.id.0), dm_text.clone())
         .reply_markup(keyboard)
-        .await?;
+        .await
+    {
+        Ok(_) => {
+            if !msg.chat.is_private() {
+                let info = bot
+                    .send_message(
+                        msg.chat.id,
+                        format!("{} check your DMs to delete items.", user.first_name),
+                    )
+                    .await?;
+                tokio::spawn(async move {
+                    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                    let _ = bot.delete_message(info.chat.id, info.id).await;
+                });
+            }
+        }
+        Err(err) => {
+            tracing::warn!("failed to send DM: {}", err);
+            let warn = bot
+                .send_message(
+                    msg.chat.id,
+                    "Unable to send you a private delete panel. Have you started me in private?",
+                )
+                .await?;
+            tokio::spawn(async move {
+                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                let _ = bot.delete_message(warn.chat.id, warn.id).await;
+            });
+        }
+    }
 
     Ok(())
 }
@@ -455,13 +505,19 @@ async fn callback_handler(bot: Bot, q: CallbackQuery, db: Pool<Sqlite>) -> Resul
             if id_str == "done" {
                 let _ = bot.delete_message(msg.chat.id, msg.id).await;
             } else if let Ok(id) = id_str.parse::<i64>() {
+                let chat_id_val = match get_item_chat_id(&db, id).await? {
+                    Some(c) => c,
+                    None => return Ok(()),
+                };
+
                 delete_item(&db, id).await?;
 
-                if let Some(main_list_id) = get_last_list_message_id(&db, msg.chat.id).await? {
-                    update_list_message(&bot, msg.chat.id, MessageId(main_list_id), &db).await?;
+                let group_chat = ChatId(chat_id_val);
+                if let Some(main_list_id) = get_last_list_message_id(&db, group_chat).await? {
+                    update_list_message(&bot, group_chat, MessageId(main_list_id), &db).await?;
                 }
 
-                let items = list_items(&db, msg.chat.id).await?;
+                let items = list_items(&db, group_chat).await?;
                 if items.is_empty() {
                     let _ = bot.delete_message(msg.chat.id, msg.id).await;
                 } else {
