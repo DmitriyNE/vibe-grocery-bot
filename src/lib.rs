@@ -34,12 +34,15 @@ pub async fn run() -> Result<()> {
     // Read the database URL from the environment, with a fallback for local dev.
     let mut db_url = env::var("DB_URL").unwrap_or_else(|_| "sqlite:shopping.db".to_string());
 
-    // --- THIS IS THE FIX ---
-    // Ensure the connection string has the 'create if not exists' flag.
-    // This is crucial for the first run on a new volume, as it tells SQLite
-    // to create the database file if it's missing.
+    // Ensure the connection string has the 'create if not exists' flag so the
+    // database file is created on first run. If other parameters are present
+    // append `&mode=rwc`, otherwise start a new query string.
     if db_url.starts_with("sqlite:") && !db_url.contains("mode=") {
-        db_url.push_str("?mode=rwc");
+        if db_url.contains('?') {
+            db_url.push_str("&mode=rwc");
+        } else {
+            db_url.push_str("?mode=rwc");
+        }
     }
 
     tracing::info!("Connecting to database at: {}", &db_url);
