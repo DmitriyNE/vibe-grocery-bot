@@ -74,18 +74,31 @@ pub fn format_delete_list(
     (text, InlineKeyboardMarkup::new(keyboard_buttons))
 }
 
+/// Clean a single text line from a user message.
+///
+/// Returns `None` if the line should be ignored (for example it is the
+/// archived list separator or becomes empty after trimming). Otherwise returns
+/// the cleaned line without leading status emojis or whitespace.
+pub fn parse_item_line(line: &str) -> Option<String> {
+    if line.trim() == "--- Archived List ---" {
+        return None;
+    }
+
+    let cleaned = line.trim_start_matches(['✅', '🛒']).trim();
+
+    if cleaned.is_empty() {
+        None
+    } else {
+        Some(cleaned.to_string())
+    }
+}
+
 pub async fn add_items_from_text(bot: Bot, msg: Message, db: Pool<Sqlite>) -> Result<()> {
     if let Some(text) = msg.text() {
         let mut items_added_count = 0;
         for line in text.lines() {
-            if line.trim() == "--- Archived List ---" {
-                continue;
-            }
-
-            let cleaned_line = line.trim_start_matches(['✅', '🛒']).trim();
-
-            if !cleaned_line.is_empty() {
-                add_item(&db, msg.chat.id, cleaned_line).await?;
+            if let Some(cleaned_line) = parse_item_line(line) {
+                add_item(&db, msg.chat.id, &cleaned_line).await?;
                 items_added_count += 1;
             }
         }
