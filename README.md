@@ -8,4 +8,8 @@ This is a small Telegram bot for keeping a collaborative grocery list. The code 
 
 You'll need a recent Rust toolchain with `sqlx` and `teloxide` dependencies. The CI configuration uses `cargo fmt`, `cargo clippy` and `cargo test` so running them locally is a good idea too.
 
+The bot now manages its database schema through embedded SQLx migrations. When
+the application starts it will automatically run any migrations found in the
+`migrations/` directory.
+
 Have fun and vibe responsibly!
