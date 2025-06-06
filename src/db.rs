@@ -219,7 +219,9 @@ pub async fn clear_delete_session(db: &Pool<Sqlite>, user_id: i64) -> Result<()>
 mod tests {
     use super::*;
     use proptest::prelude::*;
+    use sqlx::{sqlite::SqlitePoolOptions, Pool, Sqlite};
     use std::collections::HashSet;
+    use teloxide::types::{ChatId, MessageId};
 
     #[test]
     fn parse_selected_empty() {
@@ -267,5 +269,63 @@ mod tests {
             expected.sort_unstable();
             prop_assert_eq!(parsed, expected);
         }
+    }
+
+    async fn setup_db() -> Pool<Sqlite> {
+        let db = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+
+        sqlx::query(
+            "CREATE TABLE delete_session(
+                user_id INTEGER PRIMARY KEY,
+                chat_id INTEGER NOT NULL,
+                selected TEXT NOT NULL DEFAULT '',
+                notice_chat_id INTEGER,
+                notice_message_id INTEGER,
+                dm_message_id INTEGER
+            )",
+        )
+        .execute(&db)
+        .await
+        .unwrap();
+
+        db
+    }
+
+    #[tokio::test]
+    async fn delete_session_roundtrip() -> Result<()> {
+        let db = setup_db().await;
+        let user = 1i64;
+        let chat_a = ChatId(10);
+        init_delete_session(&db, user, chat_a).await?;
+
+        let mut session = get_delete_session(&db, user).await?.unwrap();
+        assert_eq!(session.chat_id, chat_a);
+        assert!(session.selected.is_empty());
+        assert!(session.notice.is_none());
+        assert!(session.dm_message_id.is_none());
+
+        let mut selected = HashSet::new();
+        selected.insert(5);
+        selected.insert(7);
+        update_delete_selection(&db, user, &selected).await?;
+
+        session = get_delete_session(&db, user).await?.unwrap();
+        assert_eq!(session.selected, selected);
+
+        set_delete_notice(&db, user, ChatId(20), MessageId(3)).await?;
+        set_delete_dm_message(&db, user, MessageId(4)).await?;
+
+        session = get_delete_session(&db, user).await?.unwrap();
+        assert_eq!(session.notice, Some((ChatId(20), MessageId(3))));
+        assert_eq!(session.dm_message_id, Some(MessageId(4)));
+
+        clear_delete_session(&db, user).await?;
+        assert!(get_delete_session(&db, user).await?.is_none());
+
+        Ok(())
     }
 }
