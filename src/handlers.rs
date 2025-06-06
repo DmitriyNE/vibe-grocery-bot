@@ -1,0 +1,359 @@
+use anyhow::Result;
+use sqlx::{Pool, Sqlite};
+use std::collections::HashSet;
+use teloxide::{
+    prelude::*,
+    types::{ChatId, InlineKeyboardButton, InlineKeyboardMarkup, MessageId, UserId},
+};
+
+use crate::db::*;
+
+pub async fn help(bot: Bot, msg: Message) -> Result<()> {
+    bot.send_message(
+        msg.chat.id,
+        "Send me any text to add it to your shopping list. Each line will be a new item.\n\
+         You can tap the checkbox button next to an item to mark it as bought.\n\n\
+         <b>Commands:</b>\n\
+         /list - Show the current shopping list.\n\
+         /archive - Finalize and archive the current list, starting a new one.\n\
+         /delete - Show a temporary panel to delete items from the list.\n\
+         /nuke - Completely delete the current list.",
+    )
+    .parse_mode(teloxide::types::ParseMode::Html)
+    .await?;
+    Ok(())
+}
+
+pub fn format_list(items: &[Item]) -> (String, InlineKeyboardMarkup) {
+    let mut text = String::new();
+    let mut keyboard_buttons = Vec::new();
+
+    for item in items {
+        let mark = if item.done { "✅" } else { "🛒" };
+        let button_text = if item.done {
+            format!("✅ {}", item.text)
+        } else {
+            item.text.clone()
+        };
+        text.push_str(&format!("{} {}\n", mark, item.text));
+        keyboard_buttons.push(vec![InlineKeyboardButton::callback(
+            button_text,
+            item.id.to_string(),
+        )]);
+    }
+
+    (text, InlineKeyboardMarkup::new(keyboard_buttons))
+}
+
+pub fn format_delete_list(
+    items: &[Item],
+    selected: &HashSet<i64>,
+) -> (String, InlineKeyboardMarkup) {
+    let text = "Select items to delete, then tap 'Done Deleting'.".to_string();
+
+    let mut keyboard_buttons = Vec::new();
+
+    for item in items {
+        let button_text = if selected.contains(&item.id) {
+            format!("☑️ {}", item.text)
+        } else {
+            format!("❌ {}", item.text)
+        };
+        let callback_data = format!("delete_{}", item.id);
+        keyboard_buttons.push(vec![InlineKeyboardButton::callback(
+            button_text,
+            callback_data,
+        )]);
+    }
+
+    keyboard_buttons.push(vec![InlineKeyboardButton::callback(
+        "✅ Done Deleting",
+        "delete_done",
+    )]);
+
+    (text, InlineKeyboardMarkup::new(keyboard_buttons))
+}
+
+pub async fn add_items_from_text(bot: Bot, msg: Message, db: Pool<Sqlite>) -> Result<()> {
+    if let Some(text) = msg.text() {
+        let mut items_added_count = 0;
+        for line in text.lines() {
+            if line.trim() == "--- Archived List ---" {
+                continue;
+            }
+
+            let cleaned_line = line.trim_start_matches(['✅', '🛒']).trim();
+
+            if !cleaned_line.is_empty() {
+                add_item(&db, msg.chat.id, cleaned_line).await?;
+                items_added_count += 1;
+            }
+        }
+
+        if items_added_count > 0 {
+            tracing::info!(
+                "Added {} item(s) for chat {}",
+                items_added_count,
+                msg.chat.id
+            );
+            send_list(bot, msg.chat.id, &db).await?;
+        }
+    }
+    Ok(())
+}
+
+pub async fn send_list(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()> {
+    if let Some(message_id) = get_last_list_message_id(db, chat_id).await? {
+        let _ = bot.delete_message(chat_id, MessageId(message_id)).await;
+    }
+
+    let items = list_items(db, chat_id).await?;
+
+    if items.is_empty() {
+        let sent_msg = bot
+            .send_message(
+                chat_id,
+                "Your shopping list is empty! Send any message to add an item.",
+            )
+            .await?;
+        update_last_list_message_id(db, chat_id, sent_msg.id).await?;
+        return Ok(());
+    }
+
+    let (text, keyboard) = format_list(&items);
+
+    let sent_msg = bot
+        .send_message(chat_id, text)
+        .reply_markup(keyboard)
+        .await?;
+
+    update_last_list_message_id(db, chat_id, sent_msg.id).await?;
+
+    Ok(())
+}
+
+pub async fn update_list_message(
+    bot: &Bot,
+    chat_id: ChatId,
+    message_id: MessageId,
+    db: &Pool<Sqlite>,
+) -> Result<()> {
+    let items = list_items(db, chat_id).await?;
+
+    if items.is_empty() {
+        let _ = bot
+            .edit_message_text(chat_id, message_id, "List is now empty!")
+            .reply_markup(InlineKeyboardMarkup::new(
+                Vec::<Vec<InlineKeyboardButton>>::new(),
+            ))
+            .await;
+        return Ok(());
+    }
+
+    let (text, keyboard) = format_list(&items);
+
+    let _ = bot
+        .edit_message_text(chat_id, message_id, text)
+        .reply_markup(keyboard)
+        .await;
+
+    Ok(())
+}
+
+pub async fn archive(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()> {
+    let last_message_id = match get_last_list_message_id(db, chat_id).await? {
+        Some(id) => id,
+        None => {
+            bot.send_message(chat_id, "There is no active list to archive.")
+                .await?;
+            return Ok(());
+        }
+    };
+
+    let items = list_items(db, chat_id).await?;
+    if items.is_empty() {
+        bot.send_message(chat_id, "There is no active list to archive.")
+            .await?;
+        return Ok(());
+    }
+
+    let (final_text, _) = format_list(&items);
+    let archived_text = format!("--- Archived List ---\n{}", final_text);
+
+    let _ = bot
+        .edit_message_text(chat_id, MessageId(last_message_id), archived_text)
+        .reply_markup(InlineKeyboardMarkup::new(
+            Vec::<Vec<InlineKeyboardButton>>::new(),
+        ))
+        .await;
+
+    delete_all_items(db, chat_id).await?;
+    clear_last_list_message_id(db, chat_id).await?;
+
+    bot.send_message(chat_id, "List archived! Send a message to start a new one.")
+        .await?;
+
+    Ok(())
+}
+
+pub async fn enter_delete_mode(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Result<()> {
+    let _ = bot.delete_message(msg.chat.id, msg.id).await;
+
+    if get_last_list_message_id(db, msg.chat.id).await?.is_none() {
+        let sent_msg = bot
+            .send_message(msg.chat.id, "There is no active list to edit.")
+            .await?;
+        tokio::spawn(async move {
+            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+            let _ = bot.delete_message(sent_msg.chat.id, sent_msg.id).await;
+        });
+        return Ok(());
+    }
+
+    let user = match msg.from() {
+        Some(u) => u,
+        None => return Ok(()),
+    };
+
+    if let Some(prev) = get_delete_session(db, user.id.0 as i64).await? {
+        if let Some((c, m)) = prev.notice {
+            let _ = bot.delete_message(c, m).await;
+        }
+        if let Some(dm) = prev.dm_message_id {
+            let _ = bot.delete_message(ChatId(user.id.0 as i64), dm).await;
+        }
+    }
+
+    let items = list_items(db, msg.chat.id).await?;
+    if items.is_empty() {
+        return Ok(());
+    }
+
+    init_delete_session(db, user.id.0 as i64, msg.chat.id).await?;
+
+    let (base_text, keyboard) = { format_delete_list(&items, &HashSet::new()) };
+
+    let chat_name = msg
+        .chat
+        .title()
+        .map(ToString::to_string)
+        .unwrap_or_else(|| "your list".to_string());
+    let dm_text = format!("Deleting items from {}.\n\n{}", chat_name, base_text);
+
+    match bot
+        .send_message(UserId(user.id.0), dm_text.clone())
+        .reply_markup(keyboard)
+        .await
+    {
+        Ok(dm_msg) => {
+            set_delete_dm_message(db, user.id.0 as i64, dm_msg.id).await?;
+            if !msg.chat.is_private() {
+                let info = bot
+                    .send_message(
+                        msg.chat.id,
+                        format!("{} is selecting items to delete...", user.first_name),
+                    )
+                    .await?;
+                set_delete_notice(db, user.id.0 as i64, msg.chat.id, info.id).await?;
+            }
+        }
+        Err(err) => {
+            tracing::warn!("failed to send DM: {}", err);
+            let warn = bot
+                .send_message(
+                    msg.chat.id,
+                    "Unable to send you a private delete panel. Have you started me in private?",
+                )
+                .await?;
+            tokio::spawn(async move {
+                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                let _ = bot.delete_message(warn.chat.id, warn.id).await;
+            });
+        }
+    }
+
+    Ok(())
+}
+
+pub async fn nuke_list(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Result<()> {
+    let _ = bot.delete_message(msg.chat.id, msg.id).await;
+
+    if let Some(list_message_id) = get_last_list_message_id(db, msg.chat.id).await? {
+        let _ = bot
+            .delete_message(msg.chat.id, MessageId(list_message_id))
+            .await;
+    }
+
+    delete_all_items(db, msg.chat.id).await?;
+    clear_last_list_message_id(db, msg.chat.id).await?;
+
+    let confirmation = bot
+        .send_message(msg.chat.id, "The active list has been nuked.")
+        .await?;
+    tokio::spawn(async move {
+        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+        let _ = bot
+            .delete_message(confirmation.chat.id, confirmation.id)
+            .await;
+    });
+
+    Ok(())
+}
+
+pub async fn callback_handler(bot: Bot, q: CallbackQuery, db: Pool<Sqlite>) -> Result<()> {
+    if let (Some(data), Some(msg)) = (q.data, q.message) {
+        if let Some(id_str) = data.strip_prefix("delete_") {
+            let user_id = q.from.id.0 as i64;
+
+            if id_str == "done" {
+                if let Some(session) = get_delete_session(&db, user_id).await? {
+                    if session.dm_message_id.map(|m| m.0) != Some(msg.id.0) {
+                        return Ok(());
+                    }
+                    for id in &session.selected {
+                        delete_item(&db, *id).await?;
+                    }
+
+                    if let Some(main_list_id) =
+                        get_last_list_message_id(&db, session.chat_id).await?
+                    {
+                        update_list_message(&bot, session.chat_id, MessageId(main_list_id), &db)
+                            .await?;
+                    }
+
+                    if let Some((chat_id, notice_id)) = session.notice {
+                        let _ = bot.delete_message(chat_id, notice_id).await;
+                    }
+
+                    clear_delete_session(&db, user_id).await?;
+                }
+
+                let _ = bot.delete_message(msg.chat.id, msg.id).await;
+            } else if let Ok(id) = id_str.parse::<i64>() {
+                if let Some(mut session) = get_delete_session(&db, user_id).await? {
+                    if session.dm_message_id.map(|m| m.0) != Some(msg.id.0) {
+                        return Ok(());
+                    }
+                    if session.selected.contains(&id) {
+                        session.selected.remove(&id);
+                    } else {
+                        session.selected.insert(id);
+                    }
+                    update_delete_selection(&db, user_id, &session.selected).await?;
+                    let items = list_items(&db, session.chat_id).await?;
+                    let (text, keyboard) = format_delete_list(&items, &session.selected);
+                    let _ = bot
+                        .edit_message_text(msg.chat.id, msg.id, text)
+                        .reply_markup(keyboard)
+                        .await;
+                }
+            }
+        } else if let Ok(id) = data.parse::<i64>() {
+            toggle_item(&db, id).await?;
+            update_list_message(&bot, msg.chat.id, msg.id, &db).await?;
+        }
+    }
+
+    bot.answer_callback_query(q.id).await?;
+    Ok(())
+}
