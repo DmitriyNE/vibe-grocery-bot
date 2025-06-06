@@ -219,7 +219,7 @@ async fn help(bot: Bot, msg: Message) -> Result<()> {
          <b>Commands:</b>\n\
          /list - Show the current shopping list.\n\
          /archive - Finalize and archive the current list, starting a new one.\n\
-         /delete - Enter mode to delete items from the list.",
+         /delete - Show a temporary panel to delete items from the list.",
     )
     .parse_mode(teloxide::types::ParseMode::Html)
     .await?;
@@ -250,7 +250,7 @@ fn format_list(items: &[Item]) -> (String, InlineKeyboardMarkup) {
 
 /// Generates the text and keyboard for the delete mode view.
 fn format_delete_list(items: &[Item]) -> (String, InlineKeyboardMarkup) {
-    let text = "Select items to delete:".to_string();
+    let text = "Tap an item to delete it. Tap 'Done' when finished.".to_string();
     let mut keyboard_buttons = Vec::new();
 
     for item in items {
@@ -330,12 +330,18 @@ async fn send_list(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()> {
 }
 
 /// Atomically edits an existing message to update the list.
-async fn update_list_message(bot: &Bot, msg: &Message, db: &Pool<Sqlite>) -> Result<()> {
-    let items = list_items(db, msg.chat.id).await?;
+/// This function now takes message_id and chat_id to avoid needing the full Message object.
+async fn update_list_message(
+    bot: &Bot,
+    chat_id: ChatId,
+    message_id: MessageId,
+    db: &Pool<Sqlite>,
+) -> Result<()> {
+    let items = list_items(db, chat_id).await?;
 
     if items.is_empty() {
         let _ = bot
-            .edit_message_text(msg.chat.id, msg.id, "List is now empty!")
+            .edit_message_text(chat_id, message_id, "List is now empty!")
             .reply_markup(InlineKeyboardMarkup::new(
                 Vec::<Vec<InlineKeyboardButton>>::new(),
             ))
@@ -346,7 +352,7 @@ async fn update_list_message(bot: &Bot, msg: &Message, db: &Pool<Sqlite>) -> Res
     let (text, keyboard) = format_list(&items);
 
     let _ = bot
-        .edit_message_text(msg.chat.id, msg.id, text)
+        .edit_message_text(chat_id, message_id, text)
         .reply_markup(keyboard)
         .await;
 
@@ -390,33 +396,35 @@ async fn archive(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()> {
     Ok(())
 }
 
-/// Switches the active list message into "delete mode".
+/// Sends a temporary, user-specific message with delete buttons.
 async fn enter_delete_mode(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Result<()> {
-    // Clean up the command message
+    // Immediately delete the user's /delete command to keep the chat clean.
     let _ = bot.delete_message(msg.chat.id, msg.id).await;
 
-    let last_message_id = match get_last_list_message_id(db, msg.chat.id).await? {
-        Some(id) => id,
-        None => {
-            bot.send_message(msg.chat.id, "There is no active list to edit.")
-                .await?;
-            return Ok(());
-        }
-    };
+    // Check if there is an active list to edit.
+    if get_last_list_message_id(db, msg.chat.id).await?.is_none() {
+        let sent_msg = bot
+            .send_message(msg.chat.id, "There is no active list to edit.")
+            .await?;
+        // Delete this notification after a few seconds.
+        tokio::spawn(async move {
+            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+            let _ = bot.delete_message(sent_msg.chat.id, sent_msg.id).await;
+        });
+        return Ok(());
+    }
 
     let items = list_items(db, msg.chat.id).await?;
     if items.is_empty() {
-        bot.send_message(msg.chat.id, "List is already empty.")
-            .await?;
-        return Ok(());
+        return Ok(()); // No items to delete, so do nothing.
     }
 
     let (text, keyboard) = format_delete_list(&items);
 
-    let _ = bot
-        .edit_message_text(msg.chat.id, MessageId(last_message_id), text)
+    // Send a new, temporary message with the delete panel.
+    bot.send_message(msg.chat.id, text)
         .reply_markup(keyboard)
-        .await;
+        .await?;
 
     Ok(())
 }
@@ -427,17 +435,22 @@ async fn callback_handler(bot: Bot, q: CallbackQuery, db: Pool<Sqlite>) -> Resul
         // --- Delete Mode Logic ---
         if let Some(id_str) = data.strip_prefix("delete_") {
             if id_str == "done" {
-                // Exit delete mode by switching back to the normal list view.
-                update_list_message(&bot, &msg, &db).await?;
+                // The user is done, so delete the temporary delete panel.
+                let _ = bot.delete_message(msg.chat.id, msg.id).await;
             } else if let Ok(id) = id_str.parse::<i64>() {
-                // Delete the selected item.
+                // 1. Delete the item from the database.
                 delete_item(&db, id).await?;
 
-                // Refresh the delete mode message with the remaining items.
+                // 2. Refresh the main shared list.
+                if let Some(main_list_id) = get_last_list_message_id(&db, msg.chat.id).await? {
+                    update_list_message(&bot, msg.chat.id, MessageId(main_list_id), &db).await?;
+                }
+
+                // 3. Refresh the temporary delete panel with the remaining items.
                 let items = list_items(&db, msg.chat.id).await?;
                 if items.is_empty() {
-                    // If the list is now empty, switch back to the normal view.
-                    update_list_message(&bot, &msg, &db).await?;
+                    // If no items are left, just delete the panel.
+                    let _ = bot.delete_message(msg.chat.id, msg.id).await;
                 } else {
                     let (text, keyboard) = format_delete_list(&items);
                     let _ = bot
@@ -449,7 +462,8 @@ async fn callback_handler(bot: Bot, q: CallbackQuery, db: Pool<Sqlite>) -> Resul
         // --- Normal Mode (Toggle) Logic ---
         } else if let Ok(id) = data.parse::<i64>() {
             toggle_item(&db, id).await?;
-            update_list_message(&bot, &msg, &db).await?;
+            // Update the main list message directly.
+            update_list_message(&bot, msg.chat.id, msg.id, &db).await?;
         }
     }
 
