@@ -1,6 +1,6 @@
 use anyhow::Result;
 use dotenvy::dotenv;
-use sqlx::{sqlite::SqlitePoolOptions, Pool, Row, Sqlite};
+use sqlx::{sqlite::SqlitePoolOptions, Pool, Sqlite};
 use std::collections::HashSet;
 use std::env; // Import the standard library's env module
 use teloxide::{
@@ -182,14 +182,6 @@ async fn delete_all_items(db: &Pool<Sqlite>, chat_id: ChatId) -> Result<()> {
         .execute(db)
         .await?;
     Ok(())
-}
-
-async fn get_item_chat_id(db: &Pool<Sqlite>, id: i64) -> Result<Option<i64>> {
-    let row = sqlx::query("SELECT chat_id FROM items WHERE id = ?")
-        .bind(id)
-        .fetch_optional(db)
-        .await?;
-    Ok(row.map(|r| r.get::<i64, _>(0)))
 }
 
 #[derive(sqlx::FromRow)]
