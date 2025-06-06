@@ -1,9 +1,8 @@
 # Vibe Grocery Bot
 
-Vibe Grocery Bot is a small Telegram bot for managing a shared shopping list.
-**This project has been vibecoded in its entirety, with only homeopathic human edits.**
+**WARNING: THIS ENTIRE PROJECT WAS VIBECODED WITH ONLY HOMEOPATHIC HUMAN EDITS!**
 
-Each chat—whether a group or a private conversation—gets its own independent list.
+Vibe Grocery Bot is a small Telegram bot for managing a shared shopping list. Each chat—whether a group or a private conversation—gets its own independent list.
 
 ## Usage
 
@@ -18,13 +17,10 @@ Send any message to the bot. Every non-empty line becomes an item. The bot respo
 
 1. Install a recent [Rust toolchain](https://www.rust-lang.org/tools/install).
 2. Clone this repository and build the binary:
-
    ```bash
    cargo build --release
    ```
-
    Or build a container image:
-
    ```bash
    docker build -t shopbot .
    ```
@@ -36,7 +32,7 @@ Set these environment variables before running:
 - `TELOXIDE_TOKEN` – Telegram bot token from @BotFather
 - `DB_URL` – optional SQLite connection string (defaults to `sqlite:shopping.db`)
 
-The database file is created automatically if needed. Any migrations in `migrations/` run on startup.
+The database file is created automatically if needed. Embedded SQLx migrations in the `migrations/` directory are executed on startup.
 
 ## Running
 
@@ -61,7 +57,6 @@ The volume stores the SQLite database under `/data`.
 ## Development
 
 Before committing, run:
-
 ```bash
 cargo fmt --all -- --check
 cargo clippy --all-targets --all-features -- -D warnings
