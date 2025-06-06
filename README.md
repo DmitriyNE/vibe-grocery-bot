@@ -1,6 +1,7 @@
 # Vibe Grocery Bot
 
-Vibe Grocery Bot is a small Telegram bot for managing a shared shopping list. It was vibecoded mostly automatically, so treat it as a fun hack.
+Vibe Grocery Bot is a small Telegram bot for managing a shared shopping list.
+**This project has been vibecoded in its entirety, with only homeopathic human edits.**
 
 Each chat—whether a group or a private conversation—gets its own independent list.
 
@@ -59,7 +60,7 @@ The volume stores the SQLite database under `/data`.
 
 ## Development
 
-Dependencies like `teloxide` and `sqlx` are fetched by Cargo. Before committing, run:
+Before committing, run:
 
 ```bash
 cargo fmt --all -- --check
