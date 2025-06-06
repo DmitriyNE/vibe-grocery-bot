@@ -1,6 +1,7 @@
 use anyhow::Result;
 use dotenvy::dotenv;
 use sqlx::{sqlite::SqlitePoolOptions, Pool, Row, Sqlite};
+use std::collections::HashSet;
 use std::env; // Import the standard library's env module
 use teloxide::{
     prelude::*,
@@ -8,7 +9,6 @@ use teloxide::{
     types::{InlineKeyboardButton, InlineKeyboardMarkup, MessageId, UserId},
     utils::command::BotCommands,
 };
-
 // ──────────────────────────────────────────────────────────────
 // Main application setup
 // ──────────────────────────────────────────────────────────────
@@ -63,6 +63,18 @@ pub async fn run() -> Result<()> {
         "CREATE TABLE IF NOT EXISTS chat_state(
             chat_id                 INTEGER PRIMARY KEY,
             last_list_message_id    INTEGER
+        )",
+    )
+    .execute(&db)
+    .await?;
+
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS delete_session(
+            user_id INTEGER PRIMARY KEY,
+            chat_id INTEGER NOT NULL,
+            selected TEXT NOT NULL DEFAULT '',
+            notice_chat_id INTEGER,
+            notice_message_id INTEGER
         )",
     )
     .execute(&db)
@@ -219,6 +231,106 @@ async fn clear_last_list_message_id(db: &Pool<Sqlite>, chat_id: ChatId) -> Resul
     Ok(())
 }
 
+#[derive(sqlx::FromRow)]
+struct DeleteSessionRow {
+    chat_id: i64,
+    selected: String,
+    notice_chat_id: Option<i64>,
+    notice_message_id: Option<i32>,
+}
+
+struct DeleteSession {
+    chat_id: ChatId,
+    selected: HashSet<i64>,
+    notice: Option<(ChatId, MessageId)>,
+}
+
+fn parse_selected(s: &str) -> HashSet<i64> {
+    s.split(',').filter_map(|p| p.parse::<i64>().ok()).collect()
+}
+
+fn join_selected(set: &HashSet<i64>) -> String {
+    let mut ids: Vec<i64> = set.iter().copied().collect();
+    ids.sort_unstable();
+    ids.into_iter()
+        .map(|id| id.to_string())
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+async fn init_delete_session(db: &Pool<Sqlite>, user_id: i64, chat_id: ChatId) -> Result<()> {
+    sqlx::query(
+        "INSERT INTO delete_session (user_id, chat_id, selected) VALUES (?, ?, '') \
+         ON CONFLICT(user_id) DO UPDATE SET chat_id=excluded.chat_id, selected='', notice_chat_id=NULL, notice_message_id=NULL",
+    )
+    .bind(user_id)
+    .bind(chat_id.0)
+    .execute(db)
+    .await?;
+    Ok(())
+}
+
+async fn update_delete_selection(
+    db: &Pool<Sqlite>,
+    user_id: i64,
+    selected: &HashSet<i64>,
+) -> Result<()> {
+    let joined = join_selected(selected);
+    sqlx::query("UPDATE delete_session SET selected = ? WHERE user_id = ?")
+        .bind(joined)
+        .bind(user_id)
+        .execute(db)
+        .await?;
+    Ok(())
+}
+
+async fn set_delete_notice(
+    db: &Pool<Sqlite>,
+    user_id: i64,
+    chat_id: ChatId,
+    message_id: MessageId,
+) -> Result<()> {
+    sqlx::query(
+        "UPDATE delete_session SET notice_chat_id = ?, notice_message_id = ? WHERE user_id = ?",
+    )
+    .bind(chat_id.0)
+    .bind(message_id.0)
+    .bind(user_id)
+    .execute(db)
+    .await?;
+    Ok(())
+}
+
+async fn get_delete_session(db: &Pool<Sqlite>, user_id: i64) -> Result<Option<DeleteSession>> {
+    if let Some(row) = sqlx::query_as::<_, DeleteSessionRow>(
+        "SELECT chat_id, selected, notice_chat_id, notice_message_id FROM delete_session WHERE user_id = ?",
+    )
+    .bind(user_id)
+    .fetch_optional(db)
+    .await?
+    {
+        let notice = match (row.notice_chat_id, row.notice_message_id) {
+            (Some(c), Some(m)) => Some((ChatId(c), MessageId(m))),
+            _ => None,
+        };
+        Ok(Some(DeleteSession {
+            chat_id: ChatId(row.chat_id),
+            selected: parse_selected(&row.selected),
+            notice,
+        }))
+    } else {
+        Ok(None)
+    }
+}
+
+async fn clear_delete_session(db: &Pool<Sqlite>, user_id: i64) -> Result<()> {
+    sqlx::query("DELETE FROM delete_session WHERE user_id = ?")
+        .bind(user_id)
+        .execute(db)
+        .await?;
+    Ok(())
+}
+
 // ──────────────────────────────────────────────────────────────
 // Bot Handlers & Helpers
 // ──────────────────────────────────────────────────────────────
@@ -260,13 +372,20 @@ pub fn format_list(items: &[Item]) -> (String, InlineKeyboardMarkup) {
     (text, InlineKeyboardMarkup::new(keyboard_buttons))
 }
 
-pub fn format_delete_list(items: &[Item]) -> (String, InlineKeyboardMarkup) {
-    let text = "Tap an item to delete it. Tap 'Done Deleting' when finished.".to_string();
+pub fn format_delete_list(
+    items: &[Item],
+    selected: &HashSet<i64>,
+) -> (String, InlineKeyboardMarkup) {
+    let text = "Select items to delete, then tap 'Done Deleting'.".to_string();
 
     let mut keyboard_buttons = Vec::new();
 
     for item in items {
-        let button_text = format!("❌ {}", item.text);
+        let button_text = if selected.contains(&item.id) {
+            format!("☑️ {}", item.text)
+        } else {
+            format!("❌ {}", item.text)
+        };
         let callback_data = format!("delete_{}", item.id);
         keyboard_buttons.push(vec![InlineKeyboardButton::callback(
             button_text,
@@ -428,7 +547,9 @@ async fn enter_delete_mode(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Result<
         return Ok(());
     }
 
-    let (base_text, keyboard) = format_delete_list(&items);
+    init_delete_session(db, user.id.0 as i64, msg.chat.id).await?;
+
+    let (base_text, keyboard) = { format_delete_list(&items, &HashSet::new()) };
 
     let chat_name = msg
         .chat
@@ -447,13 +568,10 @@ async fn enter_delete_mode(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Result<
                 let info = bot
                     .send_message(
                         msg.chat.id,
-                        format!("{} check your DMs to delete items.", user.first_name),
+                        format!("{} is selecting items to delete...", user.first_name),
                     )
                     .await?;
-                tokio::spawn(async move {
-                    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-                    let _ = bot.delete_message(info.chat.id, info.id).await;
-                });
+                set_delete_notice(db, user.id.0 as i64, msg.chat.id, info.id).await?;
             }
         }
         Err(err) => {
@@ -502,26 +620,39 @@ async fn nuke_list(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Result<()> {
 async fn callback_handler(bot: Bot, q: CallbackQuery, db: Pool<Sqlite>) -> Result<()> {
     if let (Some(data), Some(msg)) = (q.data, q.message) {
         if let Some(id_str) = data.strip_prefix("delete_") {
+            let user_id = q.from.id.0 as i64;
+
             if id_str == "done" {
-                let _ = bot.delete_message(msg.chat.id, msg.id).await;
-            } else if let Ok(id) = id_str.parse::<i64>() {
-                let chat_id_val = match get_item_chat_id(&db, id).await? {
-                    Some(c) => c,
-                    None => return Ok(()),
-                };
+                if let Some(session) = get_delete_session(&db, user_id).await? {
+                    for id in &session.selected {
+                        delete_item(&db, *id).await?;
+                    }
 
-                delete_item(&db, id).await?;
+                    if let Some(main_list_id) =
+                        get_last_list_message_id(&db, session.chat_id).await?
+                    {
+                        update_list_message(&bot, session.chat_id, MessageId(main_list_id), &db)
+                            .await?;
+                    }
 
-                let group_chat = ChatId(chat_id_val);
-                if let Some(main_list_id) = get_last_list_message_id(&db, group_chat).await? {
-                    update_list_message(&bot, group_chat, MessageId(main_list_id), &db).await?;
+                    if let Some((chat_id, notice_id)) = session.notice {
+                        let _ = bot.delete_message(chat_id, notice_id).await;
+                    }
+
+                    clear_delete_session(&db, user_id).await?;
                 }
 
-                let items = list_items(&db, group_chat).await?;
-                if items.is_empty() {
-                    let _ = bot.delete_message(msg.chat.id, msg.id).await;
-                } else {
-                    let (text, keyboard) = format_delete_list(&items);
+                let _ = bot.delete_message(msg.chat.id, msg.id).await;
+            } else if let Ok(id) = id_str.parse::<i64>() {
+                if let Some(mut session) = get_delete_session(&db, user_id).await? {
+                    if session.selected.contains(&id) {
+                        session.selected.remove(&id);
+                    } else {
+                        session.selected.insert(id);
+                    }
+                    update_delete_selection(&db, user_id, &session.selected).await?;
+                    let items = list_items(&db, session.chat_id).await?;
+                    let (text, keyboard) = format_delete_list(&items, &session.selected);
                     let _ = bot
                         .edit_message_text(msg.chat.id, msg.id, text)
                         .reply_markup(keyboard)
@@ -569,6 +700,19 @@ mod tests {
             "CREATE TABLE chat_state(
                 chat_id INTEGER PRIMARY KEY,
                 last_list_message_id INTEGER
+            )",
+        )
+        .execute(&db)
+        .await
+        .unwrap();
+
+        sqlx::query(
+            "CREATE TABLE delete_session(
+                user_id INTEGER PRIMARY KEY,
+                chat_id INTEGER NOT NULL,
+                selected TEXT NOT NULL DEFAULT '',
+                notice_chat_id INTEGER,
+                notice_message_id INTEGER
             )",
         )
         .execute(&db)
