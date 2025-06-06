@@ -198,7 +198,7 @@ async fn update_last_list_message_id(
     message_id: MessageId,
 ) -> Result<()> {
     sqlx::query(
-        "INSERT INTO chat_state (chat_id, last_list_message_id) VALUES (?, ?) 
+        "INSERT INTO chat_state (chat_id, last_list_message_id) VALUES (?, ?)
          ON CONFLICT(chat_id) DO UPDATE SET last_list_message_id = excluded.last_list_message_id",
     )
     .bind(chat_id.0)
