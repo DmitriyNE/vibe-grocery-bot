@@ -1,9 +1,17 @@
-use shopbot::{format_list, format_delete_list, Item};
+use shopbot::{format_delete_list, format_list, Item};
 
 fn sample_items() -> Vec<Item> {
     vec![
-        Item { id: 1, text: "Apples".to_string(), done: false },
-        Item { id: 2, text: "Milk".to_string(), done: true },
+        Item {
+            id: 1,
+            text: "Apples".to_string(),
+            done: false,
+        },
+        Item {
+            id: 2,
+            text: "Milk".to_string(),
+            done: true,
+        },
     ]
 }
 
