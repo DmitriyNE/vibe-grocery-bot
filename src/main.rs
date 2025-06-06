@@ -3,7 +3,8 @@ use dotenvy::dotenv;
 use sqlx::{sqlite::SqlitePoolOptions, Pool, Sqlite};
 use teloxide::{
     prelude::*,
-    types::{InlineKeyboardButton, InlineKeyboardMarkup},
+    requests::Requester,
+    types::{InlineKeyboardButton, InlineKeyboardMarkup, MessageId},
     utils::command::BotCommands,
 };
 
@@ -26,14 +27,15 @@ async fn main() -> Result<()> {
     let bot = Bot::from_env();
 
     // --- SQLite Pool ---
-    // The database will be created in a file named `shopping.db` if it doesn't exist.
     let db: Pool<Sqlite> = SqlitePoolOptions::new()
         .max_connections(5)
-        .connect("sqlite://shopping.db")
+        .connect("sqlite:shopping.db?mode=rwc")
         .await?;
 
+    tracing::info!("Database connection successful.");
+
     // --- Database Schema ---
-    // Create the 'items' table if it doesn't already exist.
+    // Create the 'items' table for the shopping list.
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS items(
             id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,8 +47,17 @@ async fn main() -> Result<()> {
     .execute(&db)
     .await?;
 
+    // Create the 'chat_state' table to track the last list message per chat.
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS chat_state(
+            chat_id                 INTEGER PRIMARY KEY,
+            last_list_message_id    INTEGER
+        )",
+    )
+    .execute(&db)
+    .await?;
+
     // --- Command Enum ---
-    // Defines the commands the bot understands.
     #[derive(BotCommands, Clone)]
     #[command(
         rename_rule = "lowercase",
@@ -64,14 +75,10 @@ async fn main() -> Result<()> {
     }
 
     // --- Handler Setup ---
-    // This is the core of the bot's logic, routing different updates to different functions.
     let handler = dptree::entry()
-        // Filter for callback queries (button presses)
         .branch(Update::filter_callback_query().endpoint(callback_handler))
-        // Filter for messages
         .branch(
             Update::filter_message()
-                // Branch for commands
                 .branch(dptree::entry().filter_command::<Command>().endpoint(
                     |bot: Bot, msg: Message, cmd: Command, db: Pool<Sqlite>| async move {
                         match cmd {
@@ -82,20 +89,10 @@ async fn main() -> Result<()> {
                         Ok(())
                     },
                 ))
-                // Default branch for any other text message (add item to list)
-                .branch(dptree::endpoint(
-                    |bot: Bot, msg: Message, db: Pool<Sqlite>| async move {
-                        if let Some(text) = msg.text() {
-                            add_item(&db, msg.chat.id, text.trim()).await?;
-                            send_list(bot, msg.chat.id, &db).await?;
-                        }
-                        Ok(())
-                    },
-                )),
+                .branch(dptree::endpoint(add_items_from_text)),
         );
 
     // --- Dispatcher ---
-    // Runs the bot, passing updates to the handler chain.
     Dispatcher::builder(bot, handler)
         .dependencies(dptree::deps![db])
         .enable_ctrlc_handler()
@@ -110,7 +107,6 @@ async fn main() -> Result<()> {
 // DB Helpers
 // ──────────────────────────────────────────────────────────────
 
-// A struct to map the database row to.
 #[derive(sqlx::FromRow)]
 struct Item {
     id: i64,
@@ -118,7 +114,7 @@ struct Item {
     done: bool,
 }
 
-/// Adds a new item to the shopping list for a given chat.
+/// Adds a single item to the database.
 async fn add_item(db: &Pool<Sqlite>, chat_id: ChatId, text: &str) -> Result<()> {
     sqlx::query("INSERT INTO items (chat_id, text) VALUES (?, ?)")
         .bind(chat_id.0)
@@ -128,21 +124,16 @@ async fn add_item(db: &Pool<Sqlite>, chat_id: ChatId, text: &str) -> Result<()> 
     Ok(())
 }
 
-/// Retrieves all non-archived items for a given chat.
-async fn list_items(db: &Pool<Sqlite>, chat_id: ChatId) -> Result<Vec<(i64, String, bool)>> {
-    let items =
-        sqlx::query_as::<_, Item>("SELECT id, text, done FROM items WHERE chat_id = ? ORDER BY id")
-            .bind(chat_id.0)
-            .fetch_all(db)
-            .await?;
-
-    Ok(items
-        .into_iter()
-        .map(|item| (item.id, item.text, item.done))
-        .collect())
+/// Retrieves all items for a given chat.
+async fn list_items(db: &Pool<Sqlite>, chat_id: ChatId) -> Result<Vec<Item>> {
+    sqlx::query_as("SELECT id, text, done FROM items WHERE chat_id = ? ORDER BY id")
+        .bind(chat_id.0)
+        .fetch_all(db)
+        .await
+        .map_err(Into::into)
 }
 
-/// Toggles the 'done' status of an item by its ID.
+/// Toggles the 'done' status of an item.
 async fn toggle_item(db: &Pool<Sqlite>, id: i64) -> Result<()> {
     sqlx::query("UPDATE items SET done = NOT done WHERE id = ?")
         .bind(id)
@@ -153,7 +144,6 @@ async fn toggle_item(db: &Pool<Sqlite>, id: i64) -> Result<()> {
 
 /// Deletes all 'done' items for a chat and returns their text.
 async fn purge_done(db: &Pool<Sqlite>, chat_id: ChatId) -> Result<Vec<String>> {
-    // A simple struct to hold just the text from the query result.
     #[derive(sqlx::FromRow)]
     struct ArchivedText {
         text: String,
@@ -175,6 +165,40 @@ async fn purge_done(db: &Pool<Sqlite>, chat_id: ChatId) -> Result<Vec<String>> {
     Ok(texts)
 }
 
+// Struct to fetch the last message ID from the chat_state table.
+#[derive(sqlx::FromRow)]
+struct ChatState {
+    last_list_message_id: i32,
+}
+
+/// Retrieves the ID of the last list message sent to a chat.
+async fn get_last_list_message_id(db: &Pool<Sqlite>, chat_id: ChatId) -> Result<Option<i32>> {
+    let result = sqlx::query_as::<_, ChatState>(
+        "SELECT last_list_message_id FROM chat_state WHERE chat_id = ?",
+    )
+    .bind(chat_id.0)
+    .fetch_optional(db)
+    .await?;
+    Ok(result.map(|r| r.last_list_message_id))
+}
+
+/// Stores the ID of the latest list message for a chat.
+async fn update_last_list_message_id(
+    db: &Pool<Sqlite>,
+    chat_id: ChatId,
+    message_id: MessageId,
+) -> Result<()> {
+    sqlx::query(
+        "INSERT INTO chat_state (chat_id, last_list_message_id) VALUES (?, ?) 
+         ON CONFLICT(chat_id) DO UPDATE SET last_list_message_id = excluded.last_list_message_id",
+    )
+    .bind(chat_id.0)
+    .bind(message_id.0)
+    .execute(db)
+    .await?;
+    Ok(())
+}
+
 // ──────────────────────────────────────────────────────────────
 // Bot Handlers & Helpers
 // ──────────────────────────────────────────────────────────────
@@ -183,7 +207,7 @@ async fn purge_done(db: &Pool<Sqlite>, chat_id: ChatId) -> Result<Vec<String>> {
 async fn help(bot: Bot, msg: Message) -> Result<()> {
     bot.send_message(
         msg.chat.id,
-        "Send me any text to add it to your shopping list.\n\
+        "Send me any text to add it to your shopping list. Each line will be a new item.\n\
          You can tap the checkbox button next to an item to mark it as bought.\n\n\
          <b>Commands:</b>\n\
          /list - Show the current shopping list.\n\
@@ -195,78 +219,113 @@ async fn help(bot: Bot, msg: Message) -> Result<()> {
 }
 
 /// Generates the text and keyboard for the shopping list.
-fn format_list(items: &[(i64, String, bool)]) -> (String, InlineKeyboardMarkup) {
+fn format_list(items: &[Item]) -> (String, InlineKeyboardMarkup) {
     let mut text = String::new();
     let mut keyboard_buttons = Vec::new();
 
-    for (id, item_text, done) in items {
-        let mark = if *done { "✅" } else { "🛒" };
-        let button_text = if *done {
-            format!("✅ {}", item_text)
+    for item in items {
+        let mark = if item.done { "✅" } else { "🛒" };
+        let button_text = if item.done {
+            format!("✅ {}", item.text)
         } else {
-            item_text.clone()
+            item.text.clone()
         };
-        text.push_str(&format!("{} {}\n", mark, item_text));
-        // Each button callback data is the item's database ID
+        text.push_str(&format!("{} {}\n", mark, item.text));
         keyboard_buttons.push(vec![InlineKeyboardButton::callback(
             button_text,
-            id.to_string(),
+            item.id.to_string(),
         )]);
     }
 
     (text, InlineKeyboardMarkup::new(keyboard_buttons))
 }
 
-/// Sends a new message with the current shopping list.
-async fn send_list(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()> {
-    let items = list_items(db, chat_id).await?;
+/// Parses a message, adding each line as a separate item.
+async fn add_items_from_text(bot: Bot, msg: Message, db: Pool<Sqlite>) -> Result<()> {
+    if let Some(text) = msg.text() {
+        let mut items_added_count = 0;
+        for line in text.lines() {
+            let trimmed_line = line.trim();
+            if !trimmed_line.is_empty() {
+                add_item(&db, msg.chat.id, trimmed_line).await?;
+                items_added_count += 1;
+            }
+        }
 
-    if items.is_empty() {
-        bot.send_message(
-            chat_id,
-            "Your shopping list is empty! Send any message to add an item.",
-        )
-        .await?;
-        return Ok(());
+        if items_added_count > 0 {
+            tracing::info!(
+                "Added {} item(s) for chat {}",
+                items_added_count,
+                msg.chat.id
+            );
+            send_list(bot, msg.chat.id, &db).await?;
+        }
     }
-
-    let (text, keyboard) = format_list(&items);
-
-    bot.send_message(chat_id, text)
-        .reply_markup(keyboard)
-        .await?;
     Ok(())
 }
 
-/// Edits an existing message to show the updated shopping list.
-async fn update_list_message(bot: Bot, msg: &Message, db: &Pool<Sqlite>) -> Result<()> {
-    let items = list_items(db, msg.chat.id).await?;
+/// Sends a new message with the shopping list, deleting the previous one.
+async fn send_list(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()> {
+    // 1. Delete the old list message, if one exists.
+    if let Some(message_id) = get_last_list_message_id(db, chat_id).await? {
+        let _ = bot.delete_message(chat_id, MessageId(message_id)).await;
+    }
+
+    let items = list_items(db, chat_id).await?;
 
     if items.is_empty() {
-        bot.edit_message_text(msg.chat.id, msg.id, "List is now empty!")
+        let sent_msg = bot
+            .send_message(
+                chat_id,
+                "Your shopping list is empty! Send any message to add an item.",
+            )
             .await?;
-        bot.edit_message_reply_markup(msg.chat.id, msg.id)
-            .reply_markup(InlineKeyboardMarkup::new(
-                Vec::<Vec<InlineKeyboardButton>>::new(),
-            ))
-            .await?;
+        update_last_list_message_id(db, chat_id, sent_msg.id).await?;
         return Ok(());
     }
 
     let (text, keyboard) = format_list(&items);
 
-    // Use edit_message_text and edit_message_reply_markup to avoid sending a new message
-    // A Timeout error can occur if the message content hasn't changed.
-    let _ = bot.edit_message_text(msg.chat.id, msg.id, text).await;
+    // 2. Send the new list message.
+    let sent_msg = bot
+        .send_message(chat_id, text)
+        .reply_markup(keyboard)
+        .await?;
+
+    // 3. Store the ID of the new message.
+    update_last_list_message_id(db, chat_id, sent_msg.id).await?;
+
+    Ok(())
+}
+
+/// Atomically edits an existing message to update the list.
+async fn update_list_message(bot: Bot, msg: &Message, db: &Pool<Sqlite>) -> Result<()> {
+    let items = list_items(db, msg.chat.id).await?;
+
+    // This block handles the case where the list becomes empty.
+    if items.is_empty() {
+        let _ = bot
+            .edit_message_text(msg.chat.id, msg.id, "List is now empty!")
+            .reply_markup(InlineKeyboardMarkup::new(
+                Vec::<Vec<InlineKeyboardButton>>::new(),
+            ))
+            .await;
+        return Ok(());
+    }
+
+    let (text, keyboard) = format_list(&items);
+
+    // Atomically edit the message text and keyboard in a single API call.
+    // This prevents the keyboard from flickering.
     let _ = bot
-        .edit_message_reply_markup(msg.chat.id, msg.id)
+        .edit_message_text(msg.chat.id, msg.id, text)
         .reply_markup(keyboard)
         .await;
 
     Ok(())
 }
 
-/// Archives completed items and informs the user.
+/// Archives completed items and sends an updated list.
 async fn archive(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()> {
     let archived = purge_done(db, chat_id).await?;
 
@@ -277,23 +336,20 @@ async fn archive(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()> {
         bot.send_message(chat_id, format!("Archived: {}", archived.join(", ")))
             .await?;
     }
-    // After archiving, show the updated list
+
     send_list(bot, chat_id, db).await?;
     Ok(())
 }
 
 /// Handles callback queries from inline button presses.
 async fn callback_handler(bot: Bot, q: CallbackQuery, db: Pool<Sqlite>) -> Result<()> {
-    // Ensure we have a message and callback data to work with
     if let (Some(data), Some(msg)) = (q.data, q.message) {
-        // The data is the database ID of the item
         if let Ok(id) = data.parse::<i64>() {
             toggle_item(&db, id).await?;
-            // Update the message in-place
             update_list_message(bot.clone(), &msg, &db).await?;
         }
     }
-    // Tell Telegram we've handled the callback
+
     bot.answer_callback_query(q.id).await?;
     Ok(())
 }
