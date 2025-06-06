@@ -74,6 +74,8 @@ async fn main() -> Result<()> {
         Archive,
         #[command(description = "enter mode to delete items from the list.")]
         Delete,
+        #[command(description = "completely delete the current list.")]
+        Nuke,
     }
 
     // --- Handler Setup ---
@@ -88,6 +90,7 @@ async fn main() -> Result<()> {
                             Command::List => send_list(bot, msg.chat.id, &db).await?,
                             Command::Archive => archive(bot, msg.chat.id, &db).await?,
                             Command::Delete => enter_delete_mode(bot, msg, &db).await?,
+                            Command::Nuke => nuke_list(bot, msg, &db).await?,
                         }
                         Ok(())
                     },
@@ -219,7 +222,8 @@ async fn help(bot: Bot, msg: Message) -> Result<()> {
          <b>Commands:</b>\n\
          /list - Show the current shopping list.\n\
          /archive - Finalize and archive the current list, starting a new one.\n\
-         /delete - Show a temporary panel to delete items from the list.",
+         /delete - Show a temporary panel to delete items from the list.\n\
+         /nuke - Completely delete the current list.",
     )
     .parse_mode(teloxide::types::ParseMode::Html)
     .await?;
@@ -271,14 +275,21 @@ fn format_delete_list(items: &[Item]) -> (String, InlineKeyboardMarkup) {
     (text, InlineKeyboardMarkup::new(keyboard_buttons))
 }
 
-/// Parses a message, adding each line as a separate item.
+/// Parses a message, adding each line as a separate item. Cleans up pasted archived lists.
 async fn add_items_from_text(bot: Bot, msg: Message, db: Pool<Sqlite>) -> Result<()> {
     if let Some(text) = msg.text() {
         let mut items_added_count = 0;
         for line in text.lines() {
-            let trimmed_line = line.trim();
-            if !trimmed_line.is_empty() {
-                add_item(&db, msg.chat.id, trimmed_line).await?;
+            // Ignore the header of a pasted archived list
+            if line.trim() == "--- Archived List ---" {
+                continue;
+            }
+
+            // Remove checkmark icons and trim whitespace
+            let cleaned_line = line.trim_start_matches(['✅', '🛒']).trim();
+
+            if !cleaned_line.is_empty() {
+                add_item(&db, msg.chat.id, cleaned_line).await?;
                 items_added_count += 1;
             }
         }
@@ -330,7 +341,6 @@ async fn send_list(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()> {
 }
 
 /// Atomically edits an existing message to update the list.
-/// This function now takes message_id and chat_id to avoid needing the full Message object.
 async fn update_list_message(
     bot: &Bot,
     chat_id: ChatId,
@@ -425,6 +435,38 @@ async fn enter_delete_mode(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Result<
     bot.send_message(msg.chat.id, text)
         .reply_markup(keyboard)
         .await?;
+
+    Ok(())
+}
+
+/// Completely deletes the current active list and its message.
+async fn nuke_list(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Result<()> {
+    // 1. Delete the user's command message.
+    let _ = bot.delete_message(msg.chat.id, msg.id).await;
+
+    // 2. Delete the main list message, if it exists.
+    if let Some(list_message_id) = get_last_list_message_id(db, msg.chat.id).await? {
+        let _ = bot
+            .delete_message(msg.chat.id, MessageId(list_message_id))
+            .await;
+    }
+
+    // 3. Delete all items for this chat from the database.
+    delete_all_items(db, msg.chat.id).await?;
+
+    // 4. Clear the chat state.
+    clear_last_list_message_id(db, msg.chat.id).await?;
+
+    // 5. Send a confirmation message that auto-deletes.
+    let confirmation = bot
+        .send_message(msg.chat.id, "The active list has been nuked.")
+        .await?;
+    tokio::spawn(async move {
+        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+        let _ = bot
+            .delete_message(confirmation.chat.id, confirmation.id)
+            .await;
+    });
 
     Ok(())
 }
