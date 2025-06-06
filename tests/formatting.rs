@@ -35,8 +35,10 @@ fn test_format_delete_list() {
     let items = sample_items();
     let (text, keyboard) = format_delete_list(&items);
 
-
-    assert_eq!(text, "Tap an item to delete it. Tap 'Done Deleting' when finished.");
+    assert_eq!(
+        text,
+        "Tap an item to delete it. Tap 'Done Deleting' when finished."
+    );
 
     let labels: Vec<&str> = keyboard
         .inline_keyboard
