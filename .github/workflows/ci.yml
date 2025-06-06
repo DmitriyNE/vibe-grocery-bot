@@ -19,5 +19,8 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Cargo clippy
         run: cargo clippy --all -- -D warnings
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
       - name: Cargo test
-        run: cargo test --all --no-fail-fast
+        run: cargo nextest run --all
