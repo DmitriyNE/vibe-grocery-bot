@@ -218,6 +218,7 @@ pub async fn clear_delete_session(db: &Pool<Sqlite>, user_id: i64) -> Result<()>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
     use std::collections::HashSet;
 
     #[test]
@@ -244,5 +245,27 @@ mod tests {
         let joined = join_selected(&original);
         let parsed = parse_selected(&joined);
         assert_eq!(original, parsed);
+    }
+
+    proptest! {
+        #[test]
+        fn prop_parse_join_roundtrip(set in proptest::collection::hash_set(0i64..1000, 0..20)) {
+            let joined = join_selected(&set);
+            let parsed = parse_selected(&joined);
+            prop_assert_eq!(set, parsed);
+        }
+
+        #[test]
+        fn prop_join_selected_sorted(set in proptest::collection::hash_set(-1000i64..1000, 0..20)) {
+            let joined = join_selected(&set);
+            let parsed: Vec<i64> = if joined.is_empty() {
+                Vec::new()
+            } else {
+                joined.split(',').map(|s| s.parse().unwrap()).collect()
+            };
+            let mut expected: Vec<i64> = set.iter().copied().collect();
+            expected.sort_unstable();
+            prop_assert_eq!(parsed, expected);
+        }
     }
 }
