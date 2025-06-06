@@ -6,11 +6,22 @@ This is a small Telegram bot for keeping a collaborative grocery list. The code 
 
 ## Development
 
-You'll need a recent Rust toolchain with `sqlx` and `teloxide` dependencies. The CI configuration uses `cargo fmt`, `cargo clippy` and `cargo test` so running them locally is a good idea too.
+You'll need a recent [Rust toolchain](https://www.rust-lang.org/tools/install). The CI configuration uses `cargo fmt`, `cargo clippy` and `cargo test` so running them locally is a good idea too.
+
+All project dependencies, including `sqlx` and `teloxide`, are fetched automatically by Cargo when building.
 
 The bot now manages its database schema through embedded SQLx migrations. When
+
 the application starts it will automatically run any migrations found in the
 `migrations/` directory.
+
+## Configuration
+
+The bot reads its settings from environment variables:
+
+* `TELOXIDE_TOKEN` - your Telegram bot token.
+* `DB_URL` - SQLite connection string (defaults to `sqlite:shopping.db`).
+  The application ensures the database file is created if it does not exist.
 
 Have fun and vibe responsibly!
 
@@ -63,13 +74,15 @@ Available commands:
 - `/delete` &mdash; open a panel to select and remove items
 - `/nuke` &mdash; completely wipe the current list
 
-Items and their state are stored per chat, so you can use the bot in group
-chats or personal conversations.
+The bot keeps one active list per chat or group. Items and their state are
+stored separately for each chat, so you can use the bot in group
+conversations or personal ones without interference.
 
 ## Deployment on Fly.io
 
 The repository includes `fly.toml` so you can deploy the bot to
-[Fly.io](https://fly.io/). After installing the Fly CLI and logging in,
+[Fly.io](https://fly.io/). Edit this file to set your own Fly app name
+before the first deploy. After installing the Fly CLI and logging in,
 run the following commands:
 
 ```bash
