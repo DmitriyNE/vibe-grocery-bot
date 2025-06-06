@@ -36,7 +36,11 @@ async fn main() -> Result<()> {
     // This is crucial for the first run on a new volume, as it tells SQLite
     // to create the database file if it's missing.
     if db_url.starts_with("sqlite:") && !db_url.contains("mode=") {
-        db_url.push_str("?mode=rwc");
+        if db_url.contains('?') {
+            db_url.push_str("&mode=rwc");
+        } else {
+            db_url.push_str("?mode=rwc");
+        }
     }
 
     tracing::info!("Connecting to database at: {}", &db_url);
