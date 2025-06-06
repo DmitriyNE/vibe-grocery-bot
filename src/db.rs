@@ -214,3 +214,35 @@ pub async fn clear_delete_session(db: &Pool<Sqlite>, user_id: i64) -> Result<()>
         .await?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    #[test]
+    fn parse_selected_empty() {
+        let set = parse_selected("");
+        assert!(set.is_empty());
+    }
+
+    #[test]
+    fn join_selected_sorts() {
+        let mut set = HashSet::new();
+        set.insert(5);
+        set.insert(3);
+        set.insert(7);
+        assert_eq!(join_selected(&set), "3,5,7");
+    }
+
+    #[test]
+    fn parse_join_roundtrip() {
+        let mut original = HashSet::new();
+        original.insert(2);
+        original.insert(1);
+        original.insert(9);
+        let joined = join_selected(&original);
+        let parsed = parse_selected(&joined);
+        assert_eq!(original, parsed);
+    }
+}
