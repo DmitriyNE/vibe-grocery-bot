@@ -70,7 +70,7 @@ async fn main() -> Result<()> {
         Help,
         #[command(description = "show the current shopping list.")]
         List,
-        #[command(description = "clear all checked items from the list.")]
+        #[command(description = "finalize and archive the current list, starting a new one.")]
         Archive,
     }
 
@@ -142,27 +142,13 @@ async fn toggle_item(db: &Pool<Sqlite>, id: i64) -> Result<()> {
     Ok(())
 }
 
-/// Deletes all 'done' items for a chat and returns their text.
-async fn purge_done(db: &Pool<Sqlite>, chat_id: ChatId) -> Result<Vec<String>> {
-    #[derive(sqlx::FromRow)]
-    struct ArchivedText {
-        text: String,
-    }
-
-    let archived_items =
-        sqlx::query_as::<_, ArchivedText>("SELECT text FROM items WHERE chat_id = ? AND done = 1")
-            .bind(chat_id.0)
-            .fetch_all(db)
-            .await?;
-
-    let texts = archived_items.into_iter().map(|r| r.text).collect();
-
-    sqlx::query("DELETE FROM items WHERE chat_id = ? AND done = 1")
+/// Deletes all items for a given chat, effectively clearing the active list.
+async fn delete_all_items(db: &Pool<Sqlite>, chat_id: ChatId) -> Result<()> {
+    sqlx::query("DELETE FROM items WHERE chat_id = ?")
         .bind(chat_id.0)
         .execute(db)
         .await?;
-
-    Ok(texts)
+    Ok(())
 }
 
 // Struct to fetch the last message ID from the chat_state table.
@@ -199,6 +185,15 @@ async fn update_last_list_message_id(
     Ok(())
 }
 
+/// Removes the tracked message ID for a chat, preventing an archived message from being deleted.
+async fn clear_last_list_message_id(db: &Pool<Sqlite>, chat_id: ChatId) -> Result<()> {
+    sqlx::query("DELETE FROM chat_state WHERE chat_id = ?")
+        .bind(chat_id.0)
+        .execute(db)
+        .await?;
+    Ok(())
+}
+
 // ──────────────────────────────────────────────────────────────
 // Bot Handlers & Helpers
 // ──────────────────────────────────────────────────────────────
@@ -211,7 +206,7 @@ async fn help(bot: Bot, msg: Message) -> Result<()> {
          You can tap the checkbox button next to an item to mark it as bought.\n\n\
          <b>Commands:</b>\n\
          /list - Show the current shopping list.\n\
-         /archive - Clear all checked items from the list.",
+         /archive - Finalize and archive the current list, starting a new one.",
     )
     .parse_mode(teloxide::types::ParseMode::Html)
     .await?;
@@ -325,19 +320,47 @@ async fn update_list_message(bot: Bot, msg: &Message, db: &Pool<Sqlite>) -> Resu
     Ok(())
 }
 
-/// Archives completed items and sends an updated list.
+/// Archives the entire current list, making it static and starting a new one.
 async fn archive(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()> {
-    let archived = purge_done(db, chat_id).await?;
+    // 1. Get the message ID of the list we are archiving.
+    let last_message_id = match get_last_list_message_id(db, chat_id).await? {
+        Some(id) => id,
+        None => {
+            bot.send_message(chat_id, "There is no active list to archive.")
+                .await?;
+            return Ok(());
+        }
+    };
 
-    if archived.is_empty() {
-        bot.send_message(chat_id, "Nothing to archive (no checked items).")
+    // 2. Get the current items to format the final message.
+    let items = list_items(db, chat_id).await?;
+    if items.is_empty() {
+        bot.send_message(chat_id, "There is no active list to archive.")
             .await?;
-    } else {
-        bot.send_message(chat_id, format!("Archived: {}", archived.join(", ")))
-            .await?;
+        return Ok(());
     }
 
-    send_list(bot, chat_id, db).await?;
+    let (final_text, _) = format_list(&items);
+    let archived_text = format!("--- Archived List ---\n{}", final_text);
+
+    // 3. Edit the message to be static (final text, no buttons).
+    let _ = bot
+        .edit_message_text(chat_id, MessageId(last_message_id), archived_text)
+        .reply_markup(InlineKeyboardMarkup::new(
+            Vec::<Vec<InlineKeyboardButton>>::new(),
+        ))
+        .await;
+
+    // 4. Delete all items for this chat from the database, starting a clean slate.
+    delete_all_items(db, chat_id).await?;
+
+    // 5. Clear the chat state so this archived message isn't deleted later.
+    clear_last_list_message_id(db, chat_id).await?;
+
+    // 6. Notify the user.
+    bot.send_message(chat_id, "List archived! Send a message to start a new one.")
+        .await?;
+
     Ok(())
 }
 
