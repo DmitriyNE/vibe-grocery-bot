@@ -254,6 +254,7 @@ pub fn format_list(items: &[Item]) -> (String, InlineKeyboardMarkup) {
 
 pub fn format_delete_list(items: &[Item]) -> (String, InlineKeyboardMarkup) {
     let text = "Tap an item to delete it. Tap 'Done Deleting' when finished.".to_string();
+
     let mut keyboard_buttons = Vec::new();
 
     for item in items {
