@@ -74,6 +74,13 @@ fn test_format_plain_list() {
 #[test]
 fn test_format_list_all_done() {
     let items = all_done_items();
-    let (text, _keyboard) = format_list(&items);
-    assert!(text.ends_with("✅ All items checked off.\n"));
+    let (text, keyboard) = format_list(&items);
+    assert_eq!(text, "✅ Apples\n✅ Milk\n");
+
+    let labels: Vec<&str> = keyboard
+        .inline_keyboard
+        .iter()
+        .map(|row| row[0].text.as_str())
+        .collect();
+    assert_eq!(labels, vec!["✅ Apples", "✅ Milk"]);
 }

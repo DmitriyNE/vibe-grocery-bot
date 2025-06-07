@@ -33,11 +33,12 @@ pub fn format_list(items: &[Item]) -> (String, InlineKeyboardMarkup) {
     let all_done = items.iter().all(|i| i.done);
 
     for item in items {
-        let mark = if item.done { "☑️" } else { "⬜" };
-        let button_text = if item.done {
-            format!("☑️ {}", item.text)
+        let (mark, button_text) = if all_done {
+            ("✅", format!("✅ {}", item.text))
+        } else if item.done {
+            ("☑️", format!("☑️ {}", item.text))
         } else {
-            format!("⬜ {}", item.text)
+            ("⬜", format!("⬜ {}", item.text))
         };
         text.push_str(&format!("{} {}\n", mark, item.text));
         keyboard_buttons.push(vec![InlineKeyboardButton::callback(
@@ -48,7 +49,6 @@ pub fn format_list(items: &[Item]) -> (String, InlineKeyboardMarkup) {
 
     if all_done && !items.is_empty() {
         tracing::debug!("List fully checked out");
-        text.push_str("✅ All items checked off.\n");
     }
 
     (text, InlineKeyboardMarkup::new(keyboard_buttons))
