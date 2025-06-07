@@ -90,16 +90,21 @@ pub fn format_plain_list(items: &[Item]) -> String {
 /// archived list separator or becomes empty after trimming). Otherwise returns
 /// the cleaned line without leading status emojis or whitespace.
 pub fn parse_item_line(line: &str) -> Option<String> {
+    tracing::trace!(?line, "Parsing item line");
     if line.trim() == "--- Archived List ---" {
+        tracing::trace!("Ignoring archived list separator");
         return None;
     }
 
     let cleaned = line.trim_start_matches(['✅', '🛒']).trim();
 
     if cleaned.is_empty() {
+        tracing::trace!("Line empty after cleaning");
         None
     } else {
-        Some(cleaned.to_string())
+        let result = cleaned.to_string();
+        tracing::trace!(?result, "Parsed line");
+        Some(result)
     }
 }
 
@@ -238,11 +243,17 @@ pub async fn add_items_from_parsed_text(
 }
 
 pub async fn send_list(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()> {
+    tracing::debug!(chat_id = chat_id.0, "Sending list");
     if let Some(message_id) = get_last_list_message_id(db, chat_id).await? {
         let _ = bot.delete_message(chat_id, MessageId(message_id)).await;
     }
 
     let items = list_items(db, chat_id).await?;
+    tracing::trace!(
+        chat_id = chat_id.0,
+        items_count = items.len(),
+        "Fetched items for list"
+    );
 
     if items.is_empty() {
         let sent_msg = bot
@@ -268,6 +279,7 @@ pub async fn send_list(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<(
 }
 
 pub async fn share_list(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()> {
+    tracing::debug!(chat_id = chat_id.0, "Sharing list");
     let items = list_items(db, chat_id).await?;
     if items.is_empty() {
         bot.send_message(chat_id, "Your shopping list is empty!")
@@ -287,7 +299,13 @@ pub async fn update_list_message(
     message_id: MessageId,
     db: &Pool<Sqlite>,
 ) -> Result<()> {
+    tracing::debug!(
+        chat_id = chat_id.0,
+        message_id = message_id.0,
+        "Updating list message"
+    );
     let items = list_items(db, chat_id).await?;
+    tracing::trace!(items_count = items.len(), "Fetched items for update");
 
     if items.is_empty() {
         let _ = bot
@@ -310,6 +328,7 @@ pub async fn update_list_message(
 }
 
 pub async fn archive(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()> {
+    tracing::debug!(chat_id = chat_id.0, "Archiving list");
     let last_message_id = match get_last_list_message_id(db, chat_id).await? {
         Some(id) => id,
         None => {
@@ -346,6 +365,11 @@ pub async fn archive(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()>
 }
 
 pub async fn enter_delete_mode(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Result<()> {
+    tracing::debug!(
+        chat_id = msg.chat.id.0,
+        user_id = msg.from().map(|u| u.id.0),
+        "Entering delete mode"
+    );
     let _ = bot.delete_message(msg.chat.id, msg.id).await;
 
     if get_last_list_message_id(db, msg.chat.id).await?.is_none() {
@@ -425,6 +449,7 @@ pub async fn enter_delete_mode(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Res
 }
 
 pub async fn nuke_list(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Result<()> {
+    tracing::debug!(chat_id = msg.chat.id.0, "Nuking list");
     let _ = bot.delete_message(msg.chat.id, msg.id).await;
 
     if let Some(list_message_id) = get_last_list_message_id(db, msg.chat.id).await? {

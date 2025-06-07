@@ -47,6 +47,7 @@ fn join_selected(set: &HashSet<i64>) -> String {
 }
 
 pub async fn connect_db(db_url: &str) -> Result<Pool<Sqlite>> {
+    tracing::debug!(db_url = %db_url, "Connecting to database");
     Ok(SqlitePoolOptions::new()
         .max_connections(5)
         .connect(db_url)
@@ -54,6 +55,7 @@ pub async fn connect_db(db_url: &str) -> Result<Pool<Sqlite>> {
 }
 
 pub async fn add_item(db: &Pool<Sqlite>, chat_id: ChatId, text: &str) -> Result<()> {
+    tracing::trace!(chat_id = chat_id.0, text = %text, "Adding item");
     sqlx::query("INSERT INTO items (chat_id, text) VALUES (?, ?)")
         .bind(chat_id.0)
         .bind(text)
@@ -63,6 +65,7 @@ pub async fn add_item(db: &Pool<Sqlite>, chat_id: ChatId, text: &str) -> Result<
 }
 
 pub async fn list_items(db: &Pool<Sqlite>, chat_id: ChatId) -> Result<Vec<Item>> {
+    tracing::trace!(chat_id = chat_id.0, "Listing items");
     sqlx::query_as("SELECT id, text, done FROM items WHERE chat_id = ? ORDER BY id")
         .bind(chat_id.0)
         .fetch_all(db)
@@ -71,6 +74,7 @@ pub async fn list_items(db: &Pool<Sqlite>, chat_id: ChatId) -> Result<Vec<Item>>
 }
 
 pub async fn toggle_item(db: &Pool<Sqlite>, id: i64) -> Result<()> {
+    tracing::trace!(item_id = id, "Toggling item");
     sqlx::query("UPDATE items SET done = NOT done WHERE id = ?")
         .bind(id)
         .execute(db)
@@ -79,6 +83,7 @@ pub async fn toggle_item(db: &Pool<Sqlite>, id: i64) -> Result<()> {
 }
 
 pub async fn delete_item(db: &Pool<Sqlite>, id: i64) -> Result<()> {
+    tracing::trace!(item_id = id, "Deleting item");
     sqlx::query("DELETE FROM items WHERE id = ?")
         .bind(id)
         .execute(db)
@@ -87,6 +92,7 @@ pub async fn delete_item(db: &Pool<Sqlite>, id: i64) -> Result<()> {
 }
 
 pub async fn delete_all_items(db: &Pool<Sqlite>, chat_id: ChatId) -> Result<()> {
+    tracing::debug!(chat_id = chat_id.0, "Deleting all items");
     sqlx::query("DELETE FROM items WHERE chat_id = ?")
         .bind(chat_id.0)
         .execute(db)
@@ -95,6 +101,7 @@ pub async fn delete_all_items(db: &Pool<Sqlite>, chat_id: ChatId) -> Result<()> 
 }
 
 pub async fn get_last_list_message_id(db: &Pool<Sqlite>, chat_id: ChatId) -> Result<Option<i32>> {
+    tracing::trace!(chat_id = chat_id.0, "Fetching last list message id");
     let result = sqlx::query_as::<_, ChatState>(
         "SELECT last_list_message_id FROM chat_state WHERE chat_id = ?",
     )
@@ -109,6 +116,11 @@ pub async fn update_last_list_message_id(
     chat_id: ChatId,
     message_id: MessageId,
 ) -> Result<()> {
+    tracing::debug!(
+        chat_id = chat_id.0,
+        message_id = message_id.0,
+        "Updating last list message id"
+    );
     sqlx::query(
         "INSERT INTO chat_state (chat_id, last_list_message_id) VALUES (?, ?) \
          ON CONFLICT(chat_id) DO UPDATE SET last_list_message_id = excluded.last_list_message_id",
@@ -121,6 +133,7 @@ pub async fn update_last_list_message_id(
 }
 
 pub async fn clear_last_list_message_id(db: &Pool<Sqlite>, chat_id: ChatId) -> Result<()> {
+    tracing::debug!(chat_id = chat_id.0, "Clearing last list message id");
     sqlx::query("DELETE FROM chat_state WHERE chat_id = ?")
         .bind(chat_id.0)
         .execute(db)
@@ -129,6 +142,7 @@ pub async fn clear_last_list_message_id(db: &Pool<Sqlite>, chat_id: ChatId) -> R
 }
 
 pub async fn init_delete_session(db: &Pool<Sqlite>, user_id: i64, chat_id: ChatId) -> Result<()> {
+    tracing::debug!(user_id, chat_id = chat_id.0, "Initializing delete session");
     sqlx::query(
         "INSERT INTO delete_session (user_id, chat_id, selected) VALUES (?, ?, '') \
          ON CONFLICT(user_id) DO UPDATE SET chat_id=excluded.chat_id, selected='', notice_chat_id=NULL, notice_message_id=NULL, dm_message_id=NULL",
@@ -145,6 +159,7 @@ pub async fn update_delete_selection(
     user_id: i64,
     selected: &HashSet<i64>,
 ) -> Result<()> {
+    tracing::trace!(user_id, selection=?selected, "Updating delete selection");
     let joined = join_selected(selected);
     sqlx::query("UPDATE delete_session SET selected = ? WHERE user_id = ?")
         .bind(joined)
@@ -160,6 +175,12 @@ pub async fn set_delete_notice(
     chat_id: ChatId,
     message_id: MessageId,
 ) -> Result<()> {
+    tracing::debug!(
+        user_id,
+        chat_id = chat_id.0,
+        message_id = message_id.0,
+        "Setting delete notice"
+    );
     sqlx::query(
         "UPDATE delete_session SET notice_chat_id = ?, notice_message_id = ? WHERE user_id = ?",
     )
@@ -176,6 +197,11 @@ pub async fn set_delete_dm_message(
     user_id: i64,
     message_id: MessageId,
 ) -> Result<()> {
+    tracing::debug!(
+        user_id,
+        message_id = message_id.0,
+        "Setting delete DM message"
+    );
     sqlx::query("UPDATE delete_session SET dm_message_id = ? WHERE user_id = ?")
         .bind(message_id.0)
         .bind(user_id)
@@ -185,6 +211,7 @@ pub async fn set_delete_dm_message(
 }
 
 pub async fn get_delete_session(db: &Pool<Sqlite>, user_id: i64) -> Result<Option<DeleteSession>> {
+    tracing::trace!(user_id, "Fetching delete session");
     if let Some(row) = sqlx::query_as::<_, DeleteSessionRow>(
         "SELECT chat_id, selected, notice_chat_id, notice_message_id, dm_message_id FROM delete_session WHERE user_id = ?",
     )
@@ -208,6 +235,7 @@ pub async fn get_delete_session(db: &Pool<Sqlite>, user_id: i64) -> Result<Optio
 }
 
 pub async fn clear_delete_session(db: &Pool<Sqlite>, user_id: i64) -> Result<()> {
+    tracing::debug!(user_id, "Clearing delete session");
     sqlx::query("DELETE FROM delete_session WHERE user_id = ?")
         .bind(user_id)
         .execute(db)
