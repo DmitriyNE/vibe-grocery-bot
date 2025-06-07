@@ -125,10 +125,8 @@ fn capitalize_first(text: &str) -> String {
     }
 }
 
-use crate::ai::stt::{
-    parse_items, parse_items_gpt, parse_voice_items, parse_voice_items_gpt, transcribe_audio,
-    SttConfig, DEFAULT_PROMPT,
-};
+use crate::ai::gpt::{parse_items_gpt, parse_voice_items_gpt};
+use crate::ai::stt::{parse_items, parse_voice_items, transcribe_audio, SttConfig, DEFAULT_PROMPT};
 use crate::ai::vision::parse_photo_items;
 use futures_util::StreamExt;
 use teloxide::net::Download;
