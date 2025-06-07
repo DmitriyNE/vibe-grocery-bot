@@ -2,8 +2,12 @@
 
 - Always run `cargo fmt --all -- --check`, `cargo clippy --all-targets --all-features -- -D warnings`, and `cargo test --all --no-fail-fast` before committing.
 - Use clear commit messages that describe the change.
+- Avoid comments for obvious code. Only add comments where they improve
+  understanding of non-trivial logic.
 - Ensure new functionality is observable via logging. Emit at least debug logs
   for important operations so behavior can be traced in production.
+- Always write tests for added functionality, preferring property-based tests
+  (proptests) when feasible.
 - Avoid global state. Persist temporary data such as deletion selections and any notice messages in the database.
 - Keep the `migrations/` directory up to date whenever the database schema changes so that embedded migrations remain in sync.
 
