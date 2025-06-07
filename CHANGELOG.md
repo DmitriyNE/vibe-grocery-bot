@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [0.2.0] - Unreleased
 1. Add items by sending a photo using OpenAI vision to detect items automatically.
 2. Display a check mark when every item in the list is checked off.
+3. Use checkbox icons for list items and show a check mark message when the list is complete.
 
 ## [0.1.0] - 2025-06-07
 1. Initial release of the Telegram shopping list bot.
