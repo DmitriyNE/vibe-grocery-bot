@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 3. Checkbox icons indicate item status in the list.
 4. Deletion mode highlights selections with red crosses, shows empty squares for
    unselected items, and uses a trashcan icon to finish.
+5. Reduced noisy HTTP logs by setting the `hyper` log level to info in `fly.toml`.
 
 
 ## [0.1.0] - 2025-06-07
