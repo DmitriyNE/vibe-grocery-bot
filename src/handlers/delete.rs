@@ -137,8 +137,11 @@ pub async fn callback_handler(bot: Bot, q: CallbackQuery, db: Pool<Sqlite>) -> R
                         delete_item(&db, *id).await?;
                     }
 
-                    if let Some(main_list_id) = get_last_list_message_id(&db, session.chat_id).await? {
-                        update_list_message(&bot, session.chat_id, MessageId(main_list_id), &db).await?;
+                    if let Some(main_list_id) =
+                        get_last_list_message_id(&db, session.chat_id).await?
+                    {
+                        update_list_message(&bot, session.chat_id, MessageId(main_list_id), &db)
+                            .await?;
                     }
 
                     if let Some((chat_id, notice_id)) = session.notice {

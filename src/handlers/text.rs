@@ -10,10 +10,9 @@ use crate::text_utils::{capitalize_first, parse_item_line};
 use super::list::send_list;
 
 pub async fn help(bot: Bot, msg: Message) -> Result<()> {
-    bot
-        .send_message(
-            msg.chat.id,
-            "Send me any text to add it to your shopping list. Each line will be a new item.\n\
+    bot.send_message(
+        msg.chat.id,
+        "Send me any text to add it to your shopping list. Each line will be a new item.\n\
              You can tap the checkbox button next to an item to mark it as bought.\n\n\
              <b>Commands:</b>\n\
              /list - Show the current shopping list.\n\
@@ -22,9 +21,9 @@ pub async fn help(bot: Bot, msg: Message) -> Result<()> {
              /share - Send the list as plain text for copying.\n\
              /nuke - Completely delete the current list.\n\
              /parse - Parse this message into items via GPT.",
-        )
-        .parse_mode(teloxide::types::ParseMode::Html)
-        .await?;
+    )
+    .parse_mode(teloxide::types::ParseMode::Html)
+    .await?;
     Ok(())
 }
 
@@ -57,7 +56,8 @@ pub async fn add_items_from_parsed_text(
     stt: Option<SttConfig>,
 ) -> Result<()> {
     let Some(config) = stt else {
-        bot.send_message(msg.chat.id, "GPT parsing is disabled.").await?;
+        bot.send_message(msg.chat.id, "GPT parsing is disabled.")
+            .await?;
         return Ok(());
     };
 

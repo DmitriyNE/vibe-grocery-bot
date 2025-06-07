@@ -1,7 +1,7 @@
 use anyhow::Result;
 use futures_util::StreamExt;
 use sqlx::{Pool, Sqlite};
-use teloxide::{prelude::*, net::Download};
+use teloxide::{net::Download, prelude::*};
 
 use crate::ai::vision::parse_photo_items;
 use crate::db::add_item;

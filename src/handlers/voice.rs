@@ -1,7 +1,7 @@
 use anyhow::Result;
 use futures_util::StreamExt;
 use sqlx::{Pool, Sqlite};
-use teloxide::{prelude::*, net::Download};
+use teloxide::{net::Download, prelude::*};
 
 use crate::ai::gpt::parse_voice_items_gpt;
 use crate::ai::stt::{parse_voice_items, transcribe_audio, SttConfig, DEFAULT_PROMPT};
