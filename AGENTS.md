@@ -10,7 +10,7 @@
   (proptests) when feasible.
 - Avoid global state. Persist temporary data such as deletion selections and any notice messages in the database.
 - Keep the `migrations/` directory up to date whenever the database schema changes so that embedded migrations remain in sync.
-- Update `CHANGELOG.md` with a new entry for any user-visible change. Keep pending changes at the top as a numbered list. When the project version is bumped, insert a `## [version] - <date>` header below that list and start a new numbered list for the next release.
+- Update `CHANGELOG.md` with a new entry for any user-visible change. Keep pending changes at the top as a numbered list. When the project version is bumped, insert a `## [version] - <date>` header above that list and start a new numbered list for the next release.
 
 # Prohibited Features
 
