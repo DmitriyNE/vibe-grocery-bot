@@ -7,6 +7,7 @@ use teloxide::{
 };
 
 use crate::db::*;
+use crate::text_utils::{capitalize_first, parse_item_line};
 
 pub async fn help(bot: Bot, msg: Message) -> Result<()> {
     bot.send_message(
@@ -127,6 +128,7 @@ fn capitalize_first(text: &str) -> String {
 
 use crate::ai::gpt::{parse_items_gpt, parse_voice_items_gpt};
 use crate::ai::stt::{parse_items, parse_voice_items, transcribe_audio, SttConfig, DEFAULT_PROMPT};
+
 use crate::ai::vision::parse_photo_items;
 use futures_util::StreamExt;
 use teloxide::net::Download;
