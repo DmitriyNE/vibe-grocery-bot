@@ -33,11 +33,11 @@ pub fn format_list(items: &[Item]) -> (String, InlineKeyboardMarkup) {
     let all_done = items.iter().all(|i| i.done);
 
     for item in items {
-        let mark = if item.done { "✅" } else { "🛒" };
+        let mark = if item.done { "☑️" } else { "⬜" };
         let button_text = if item.done {
-            format!("✅ {}", item.text)
+            format!("☑️ {}", item.text)
         } else {
-            item.text.clone()
+            format!("⬜ {}", item.text)
         };
         text.push_str(&format!("{} {}\n", mark, item.text));
         keyboard_buttons.push(vec![InlineKeyboardButton::callback(
@@ -64,7 +64,7 @@ pub fn format_delete_list(
 
     for item in items {
         let button_text = if selected.contains(&item.id) {
-            format!("☑️ {}", item.text)
+            format!("🗑️ {}", item.text)
         } else {
             format!("❌ {}", item.text)
         };
@@ -76,7 +76,7 @@ pub fn format_delete_list(
     }
 
     keyboard_buttons.push(vec![InlineKeyboardButton::callback(
-        "✅ Done Deleting",
+        "🗑️ Done Deleting",
         "delete_done",
     )]);
 
@@ -103,7 +103,9 @@ pub fn parse_item_line(line: &str) -> Option<String> {
         return None;
     }
 
-    let cleaned = line.trim_start_matches(['✅', '🛒']).trim();
+    let cleaned = line
+        .trim_start_matches(['☑', '✅', '⬜', '🛒', '\u{fe0f}'])
+        .trim();
 
     if cleaned.is_empty() {
         tracing::trace!("Line empty after cleaning");
