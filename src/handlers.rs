@@ -6,8 +6,13 @@ use teloxide::{
     types::{ChatId, InlineKeyboardButton, InlineKeyboardMarkup, MessageId, UserId},
 };
 
+use crate::ai::gpt::{parse_items_gpt, parse_voice_items_gpt};
+use crate::ai::stt::{parse_items, parse_voice_items, transcribe_audio, SttConfig, DEFAULT_PROMPT};
+use crate::ai::vision::parse_photo_items;
 use crate::db::*;
 use crate::text_utils::{capitalize_first, parse_item_line};
+use futures_util::StreamExt;
+use teloxide::net::Download;
 
 pub async fn help(bot: Bot, msg: Message) -> Result<()> {
     bot.send_message(
@@ -91,14 +96,6 @@ pub fn format_plain_list(items: &[Item]) -> String {
     }
     text
 }
-
-use crate::ai::stt::{
-    parse_items, parse_items_gpt, parse_voice_items, parse_voice_items_gpt, transcribe_audio,
-    SttConfig, DEFAULT_PROMPT,
-};
-use crate::ai::vision::parse_photo_items;
-use futures_util::StreamExt;
-use teloxide::net::Download;
 
 pub async fn add_items_from_voice(
     bot: Bot,

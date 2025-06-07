@@ -9,6 +9,7 @@ mod db;
 mod handlers;
 mod text_utils;
 
+pub use ai::gpt::{parse_items_gpt, parse_voice_items_gpt};
 pub use ai::stt::{parse_items, parse_voice_items};
 pub use db::Item;
 pub use handlers::{format_delete_list, format_list, format_plain_list};
