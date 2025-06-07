@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 2. Items show green checkmarks when the entire list is checked off.
 3. Checkbox icons indicate item status and trashcan icons appear in deletion mode.
 
+
 ## [0.1.0] - 2025-06-07
 1. Initial release of the Telegram shopping list bot.
 2. Each chat has a single list; send text to add items line by line.
