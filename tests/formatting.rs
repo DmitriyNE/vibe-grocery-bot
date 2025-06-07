@@ -61,7 +61,7 @@ fn test_format_delete_list() {
         .iter()
         .map(|row| row[0].text.as_str())
         .collect();
-    assert_eq!(labels, vec!["🗑️ Apples", "❌ Milk", "🗑️ Done Deleting"]);
+    assert_eq!(labels, vec!["❌ Apples", "⬜ Milk", "🗑️ Done Deleting"]);
 }
 
 #[test]

@@ -64,9 +64,9 @@ pub fn format_delete_list(
 
     for item in items {
         let button_text = if selected.contains(&item.id) {
-            format!("🗑️ {}", item.text)
-        } else {
             format!("❌ {}", item.text)
+        } else {
+            format!("⬜ {}", item.text)
         };
         let callback_data = format!("delete_{}", item.id);
         keyboard_buttons.push(vec![InlineKeyboardButton::callback(
