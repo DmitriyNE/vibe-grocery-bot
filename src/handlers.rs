@@ -17,6 +17,7 @@ pub async fn help(bot: Bot, msg: Message) -> Result<()> {
          /list - Show the current shopping list.\n\
          /archive - Finalize and archive the current list, starting a new one.\n\
          /delete - Show a temporary panel to delete items from the list.\n\
+         /share - Send the list as plain text for copying.\n\
          /nuke - Completely delete the current list.",
     )
     .parse_mode(teloxide::types::ParseMode::Html)
@@ -72,6 +73,14 @@ pub fn format_delete_list(
     )]);
 
     (text, InlineKeyboardMarkup::new(keyboard_buttons))
+}
+
+pub fn format_plain_list(items: &[Item]) -> String {
+    let mut text = String::new();
+    for item in items {
+        text.push_str(&format!("• {}\n", item.text));
+    }
+    text
 }
 
 /// Clean a single text line from a user message.
@@ -141,6 +150,20 @@ pub async fn send_list(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<(
         .await?;
 
     update_last_list_message_id(db, chat_id, sent_msg.id).await?;
+
+    Ok(())
+}
+
+pub async fn share_list(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()> {
+    let items = list_items(db, chat_id).await?;
+    if items.is_empty() {
+        bot.send_message(chat_id, "Your shopping list is empty!")
+            .await?;
+        return Ok(());
+    }
+
+    let text = format_plain_list(&items);
+    bot.send_message(chat_id, text).await?;
 
     Ok(())
 }

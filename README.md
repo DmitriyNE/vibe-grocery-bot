@@ -11,6 +11,7 @@ Send any message to the bot. Every non-empty line becomes an item. The bot respo
 - `/list` – show the list again
 - `/archive` – archive the current list and start a new one
 - `/delete` – select items to remove
+- `/share` – send the list as plain text
 - `/nuke` – wipe the list completely
 
 ## Installation

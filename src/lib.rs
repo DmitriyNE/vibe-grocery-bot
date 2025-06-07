@@ -8,10 +8,11 @@ mod db;
 mod handlers;
 
 pub use db::Item;
-pub use handlers::{format_delete_list, format_list, parse_item_line};
+pub use handlers::{format_delete_list, format_list, format_plain_list, parse_item_line};
 
 use handlers::{
     add_items_from_text, archive, callback_handler, enter_delete_mode, help, nuke_list, send_list,
+    share_list,
 };
 // ──────────────────────────────────────────────────────────────
 // Main application setup
@@ -73,6 +74,8 @@ pub async fn run() -> Result<()> {
         Archive,
         #[command(description = "show a temporary panel to delete items from the list.")]
         Delete,
+        #[command(description = "send the list as plain text for copying.")]
+        Share,
         #[command(description = "completely delete the current list.")]
         Nuke,
     }
@@ -89,6 +92,7 @@ pub async fn run() -> Result<()> {
                             Command::List => send_list(bot, msg.chat.id, &db).await?,
                             Command::Archive => archive(bot, msg.chat.id, &db).await?,
                             Command::Delete => enter_delete_mode(bot, msg, &db).await?,
+                            Command::Share => share_list(bot, msg.chat.id, &db).await?,
                             Command::Nuke => nuke_list(bot, msg, &db).await?,
                         }
                         Ok(())
