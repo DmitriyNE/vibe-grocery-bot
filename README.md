@@ -6,7 +6,7 @@ Vibe Grocery Bot is a small Telegram bot for managing a shared shopping list. Ea
 
 ## Usage
 
-Send any message to the bot. Every non-empty line becomes an item. The bot responds with a list message containing checkbox buttons so you can mark things bought. The main commands are:
+Send any message to the bot. Every non-empty line becomes an item. If you send a voice or photo message and an OpenAI API key is configured, the bot will try to recognize items automatically. The bot responds with a list message containing checkbox buttons so you can mark things bought. The main commands are:
 
 - `/list` – show the list again
 - `/archive` – archive the current list and start a new one
@@ -34,7 +34,7 @@ Set these environment variables before running:
 - `TELOXIDE_TOKEN` – Telegram bot token from @BotFather
 - `DB_URL` – optional SQLite connection string (defaults to `sqlite:shopping.db`)
 - `RUST_LOG` – optional logging level (e.g. `info` or `debug`)
-- `OPENAI_API_KEY` – optional API key for enabling voice message transcription
+- `OPENAI_API_KEY` – optional API key for enabling voice and photo recognition
 - `OPENAI_STT_MODEL` – optional model name (`whisper-1`, `gpt-4o-mini-transcribe`, or `gpt-4o-transcribe`)
 
 The database file is created automatically if needed. Embedded SQLx migrations in the `migrations/` directory are executed on startup.

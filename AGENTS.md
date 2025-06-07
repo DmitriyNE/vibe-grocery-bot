@@ -11,6 +11,9 @@
 - Avoid global state. Persist temporary data such as deletion selections and any notice messages in the database.
 - Keep the `migrations/` directory up to date whenever the database schema changes so that embedded migrations remain in sync.
 - Update `CHANGELOG.md` with a new entry for any user-visible change. Keep pending changes at the top as a numbered list. When the project version is bumped, insert a `## [version] - <date>` header above that list and start a new numbered list for the next release.
+- This is a generic list bot. Avoid hardcoding references to "groceries" in prompts or logs. Use generic "items" wording instead.
+- Follow the modern Rust module layout: define a `name.rs` file alongside a
+  `name/` directory for submodules instead of using `mod.rs`.
 
 # Prohibited Features
 
