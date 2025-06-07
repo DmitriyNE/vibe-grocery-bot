@@ -64,6 +64,6 @@ pub async fn request_items(
     Ok(items_json
         .items
         .into_iter()
-        .filter_map(|s| crate::handlers::parse_item_line(&s))
+        .filter_map(|s| crate::text_utils::parse_item_line(&s))
         .collect())
 }

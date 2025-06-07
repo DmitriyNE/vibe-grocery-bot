@@ -7,27 +7,19 @@ use teloxide::{prelude::*, utils::command::BotCommands};
 pub mod ai;
 mod db;
 mod handlers;
+mod text_utils;
 
+pub use ai::gpt::{parse_items_gpt, parse_voice_items_gpt};
 pub use ai::stt::{parse_items, parse_voice_items};
 pub use db::Item;
-pub use handlers::{format_delete_list, format_list, format_plain_list, parse_item_line};
+pub use handlers::{format_delete_list, format_list, format_plain_list};
+pub use text_utils::{capitalize_first, parse_item_line};
 
 use handlers::{
     add_items_from_parsed_text, add_items_from_photo, add_items_from_text, add_items_from_voice,
     archive, callback_handler, enter_delete_mode, help, nuke_list, send_list, share_list,
 };
 
-fn prepare_sqlite_url(url: &str) -> String {
-    if url.starts_with("sqlite:") && !url.contains("mode=") && !url.contains(":memory:") {
-        if url.contains('?') {
-            format!("{url}&mode=rwc")
-        } else {
-            format!("{url}?mode=rwc")
-        }
-    } else {
-        url.to_string()
-    }
-}
 // ──────────────────────────────────────────────────────────────
 // Main application setup
 // ──────────────────────────────────────────────────────────────
@@ -57,7 +49,7 @@ pub async fn run() -> Result<()> {
     // --- SQLite Pool ---
     // Read the database URL from the environment, with a fallback for local dev.
     let db_url = env::var("DB_URL").unwrap_or_else(|_| "sqlite:shopping.db".to_string());
-    let db_url = prepare_sqlite_url(&db_url);
+    let db_url = db::prepare_sqlite_url(&db_url);
 
     tracing::info!("Connecting to database at: {}", &db_url);
 
@@ -243,34 +235,5 @@ mod tests {
         assert!(get_last_list_message_id(&db, chat).await?.is_none());
 
         Ok(())
-    }
-
-    #[test]
-    fn prepare_sqlite_url_basic() {
-        assert_eq!(
-            prepare_sqlite_url("sqlite:items.db"),
-            "sqlite:items.db?mode=rwc"
-        );
-    }
-
-    #[test]
-    fn prepare_sqlite_url_with_query() {
-        assert_eq!(
-            prepare_sqlite_url("sqlite:items.db?cache=shared"),
-            "sqlite:items.db?cache=shared&mode=rwc"
-        );
-    }
-
-    #[test]
-    fn prepare_sqlite_url_existing_mode() {
-        assert_eq!(
-            prepare_sqlite_url("sqlite:items.db?mode=ro"),
-            "sqlite:items.db?mode=ro"
-        );
-    }
-
-    #[test]
-    fn prepare_sqlite_url_memory() {
-        assert_eq!(prepare_sqlite_url("sqlite::memory:"), "sqlite::memory:");
     }
 }
