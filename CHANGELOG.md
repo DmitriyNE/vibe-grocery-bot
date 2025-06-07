@@ -12,4 +12,5 @@ All notable changes to this project will be documented in this file.
 8. `/nuke` completely deletes the list.
 9. `/parse` uses GPT to parse a message into items.
 10. Optional voice message parsing via OpenAI speech-to-text.
+11. Configurable speech model via `OPENAI_STT_MODEL` in `fly.toml`.
 
