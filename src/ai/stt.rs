@@ -82,17 +82,17 @@ pub async fn transcribe_audio_test(
 /// Split a transcription string from speech-to-text into individual items.
 ///
 /// The text is split on commas, newlines and the word "and". Each segment is
-/// then cleaned via [`crate::handlers::parse_item_line`]. Empty segments are
+/// then cleaned via [`crate::text_utils::parse_item_line`]. Empty segments are
 /// ignored.
 /// Split a text string into individual items.
 ///
 /// The input is split on commas, newlines and the word "and". Each segment is
-/// then cleaned via [`crate::handlers::parse_item_line`]. Empty segments are
+/// then cleaned via [`crate::text_utils::parse_item_line`]. Empty segments are
 /// ignored.
 pub fn parse_items(text: &str) -> Vec<String> {
     text.split([',', '\n'])
         .flat_map(|seg| seg.split(" and "))
-        .filter_map(crate::handlers::parse_item_line)
+        .filter_map(crate::text_utils::parse_item_line)
         .collect()
 }
 

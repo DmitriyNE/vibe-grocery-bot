@@ -7,6 +7,7 @@ use teloxide::{
 };
 
 use crate::db::*;
+use crate::text_utils::{capitalize_first, parse_item_line};
 
 pub async fn help(bot: Bot, msg: Message) -> Result<()> {
     bot.send_message(
