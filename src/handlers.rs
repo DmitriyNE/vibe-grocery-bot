@@ -96,6 +96,7 @@ pub fn format_plain_list(items: &[Item]) -> String {
     }
     text
 }
+
 pub async fn add_items_from_voice(
     bot: Bot,
     msg: Message,
