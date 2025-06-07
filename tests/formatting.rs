@@ -15,6 +15,21 @@ fn sample_items() -> Vec<Item> {
     ]
 }
 
+fn all_done_items() -> Vec<Item> {
+    vec![
+        Item {
+            id: 1,
+            text: "Apples".to_string(),
+            done: true,
+        },
+        Item {
+            id: 2,
+            text: "Milk".to_string(),
+            done: true,
+        },
+    ]
+}
+
 #[test]
 fn test_format_list() {
     let items = sample_items();
@@ -54,4 +69,11 @@ fn test_format_plain_list() {
     let items = sample_items();
     let text = format_plain_list(&items);
     assert_eq!(text, "• Apples\n• Milk\n");
+}
+
+#[test]
+fn test_format_list_all_done() {
+    let items = all_done_items();
+    let (text, _keyboard) = format_list(&items);
+    assert!(text.ends_with("✅ All items checked off.\n"));
 }

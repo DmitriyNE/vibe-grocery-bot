@@ -30,6 +30,8 @@ pub fn format_list(items: &[Item]) -> (String, InlineKeyboardMarkup) {
     let mut text = String::new();
     let mut keyboard_buttons = Vec::new();
 
+    let all_done = items.iter().all(|i| i.done);
+
     for item in items {
         let mark = if item.done { "✅" } else { "🛒" };
         let button_text = if item.done {
@@ -42,6 +44,11 @@ pub fn format_list(items: &[Item]) -> (String, InlineKeyboardMarkup) {
             button_text,
             item.id.to_string(),
         )]);
+    }
+
+    if all_done && !items.is_empty() {
+        tracing::debug!("List fully checked out");
+        text.push_str("✅ All items checked off.\n");
     }
 
     (text, InlineKeyboardMarkup::new(keyboard_buttons))
