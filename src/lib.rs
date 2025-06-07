@@ -22,6 +22,7 @@ pub use text_utils::{capitalize_first, parse_item_line};
         url.to_string()
     }
 }
+
 // ──────────────────────────────────────────────────────────────
 // Main application setup
 // ──────────────────────────────────────────────────────────────
@@ -51,7 +52,7 @@ pub async fn run() -> Result<()> {
     // --- SQLite Pool ---
     // Read the database URL from the environment, with a fallback for local dev.
     let db_url = env::var("DB_URL").unwrap_or_else(|_| "sqlite:shopping.db".to_string());
-    let db_url = prepare_sqlite_url(&db_url);
+    let db_url = db::prepare_sqlite_url(&db_url);
 
     tracing::info!("Connecting to database at: {}", &db_url);
 
