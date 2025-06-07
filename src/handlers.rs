@@ -103,6 +103,14 @@ pub fn parse_item_line(line: &str) -> Option<String> {
     }
 }
 
+fn capitalize_first(text: &str) -> String {
+    let mut chars = text.chars();
+    match chars.next() {
+        Some(c) => c.to_uppercase().chain(chars).collect(),
+        None => String::new(),
+    }
+}
+
 use crate::stt::{
     parse_items, parse_items_gpt, parse_voice_items, parse_voice_items_gpt, transcribe_audio,
     SttConfig, DEFAULT_PROMPT,
@@ -143,7 +151,8 @@ pub async fn add_items_from_voice(
             };
             let mut added = 0;
             for item in items {
-                add_item(&db, msg.chat.id, &item).await?;
+                let cap = capitalize_first(&item);
+                add_item(&db, msg.chat.id, &cap).await?;
                 added += 1;
             }
             if added > 0 {
@@ -211,7 +220,8 @@ pub async fn add_items_from_parsed_text(
 
     let mut added = 0;
     for item in items {
-        add_item(&db, msg.chat.id, &item).await?;
+        let cap = capitalize_first(&item);
+        add_item(&db, msg.chat.id, &cap).await?;
         added += 1;
     }
 
