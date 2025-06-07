@@ -10,11 +10,11 @@ pub mod stt;
 
 pub use db::Item;
 pub use handlers::{format_delete_list, format_list, format_plain_list, parse_item_line};
-pub use stt::parse_voice_items;
+pub use stt::{parse_items, parse_voice_items};
 
 use handlers::{
-    add_items_from_text, add_items_from_voice, archive, callback_handler, enter_delete_mode, help,
-    nuke_list, send_list, share_list,
+    add_items_from_parsed_text, add_items_from_text, add_items_from_voice, archive,
+    callback_handler, enter_delete_mode, help, nuke_list, send_list, share_list,
 };
 // ──────────────────────────────────────────────────────────────
 // Main application setup
@@ -89,6 +89,8 @@ pub async fn run() -> Result<()> {
         Share,
         #[command(description = "completely delete the current list.")]
         Nuke,
+        #[command(description = "parse items from the given text using GPT.")]
+        Parse,
     }
 
     // --- Handler Setup ---
@@ -102,7 +104,11 @@ pub async fn run() -> Result<()> {
                         .endpoint(add_items_from_voice),
                 )
                 .branch(dptree::entry().filter_command::<Command>().endpoint(
-                    |bot: Bot, msg: Message, cmd: Command, db: Pool<Sqlite>| async move {
+                    |bot: Bot,
+                     msg: Message,
+                     cmd: Command,
+                     db: Pool<Sqlite>,
+                     stt_config: Option<crate::stt::SttConfig>| async move {
                         match cmd {
                             Command::Start | Command::Help => help(bot, msg).await?,
                             Command::List => send_list(bot, msg.chat.id, &db).await?,
@@ -110,6 +116,9 @@ pub async fn run() -> Result<()> {
                             Command::Delete => enter_delete_mode(bot, msg, &db).await?,
                             Command::Share => share_list(bot, msg.chat.id, &db).await?,
                             Command::Nuke => nuke_list(bot, msg, &db).await?,
+                            Command::Parse => {
+                                add_items_from_parsed_text(bot, msg, db, stt_config).await?
+                            }
                         }
                         Ok(())
                     },

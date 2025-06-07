@@ -13,6 +13,7 @@ Send any message to the bot. Every non-empty line becomes an item. The bot respo
 - `/delete` – select items to remove
 - `/share` – send the list as plain text
 - `/nuke` – wipe the list completely
+- `/parse` – let GPT parse this message into items
 
 ## Installation
 
