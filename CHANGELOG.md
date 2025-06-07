@@ -2,16 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.1.0] - 2025-06-07
-### Added
-- Initial release of the Telegram shopping list bot.
-- Each chat has a single list; send text to add items line by line.
-- Inline checkbox buttons allow marking items as bought.
-- `/list` shows the current list.
-- `/archive` finalizes and archives the list, starting a new one.
-- `/delete` opens a panel to delete items.
-- `/share` sends the list as plain text.
-- `/nuke` completely deletes the list.
-- `/parse` uses GPT to parse a message into items.
-- Optional voice message parsing via OpenAI speech-to-text.
+1. Initial release of the Telegram shopping list bot.
+2. Each chat has a single list; send text to add items line by line.
+3. Inline checkbox buttons allow marking items as bought.
+4. `/list` shows the current list.
+5. `/archive` finalizes and archives the list, starting a new one.
+6. `/delete` opens a panel to delete items.
+7. `/share` sends the list as plain text.
+8. `/nuke` completely deletes the list.
+9. `/parse` uses GPT to parse a message into items.
+10. Optional voice message parsing via OpenAI speech-to-text.
 
