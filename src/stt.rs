@@ -9,8 +9,7 @@ pub struct SttConfig {
 }
 
 /// Default instructions passed to GPT-based transcription models.
-pub const DEFAULT_PROMPT: &str =
-    "List the grocery items mentioned, separated by commas or the word 'and'.";
+pub const DEFAULT_PROMPT: &str = "List the items mentioned, separated by commas or the word 'and'.";
 
 #[derive(Deserialize)]
 struct TranscriptionResponse {
@@ -77,7 +76,7 @@ pub async fn transcribe_audio_test(
 /// The text is split on commas, newlines and the word "and". Each segment is
 /// then cleaned via [`crate::handlers::parse_item_line`]. Empty segments are
 /// ignored.
-/// Split a text string into individual grocery items.
+/// Split a text string into individual items.
 ///
 /// The input is split on commas, newlines and the word "and". Each segment is
 /// then cleaned via [`crate::handlers::parse_item_line`]. Empty segments are
@@ -116,7 +115,7 @@ struct ItemsJson {
 
 const OPENAI_CHAT_URL: &str = "https://api.openai.com/v1/chat/completions";
 
-/// Use the OpenAI Chat API to parse grocery items from arbitrary text.
+/// Use the OpenAI Chat API to parse items from arbitrary text.
 ///
 /// The model is instructed to return a JSON object with an `items` array. The
 /// returned list is cleaned with [`crate::handlers::parse_item_line`].
@@ -137,7 +136,7 @@ pub async fn parse_items_gpt_inner(api_key: &str, text: &str, url: &str) -> Resu
         "messages": [
             {
                 "role": "system",
-                "content": "Extract the grocery items from the user's text. Respond with a JSON object like {\"items\": [\"apples\"]}.",
+                "content": "Extract the items from the user's text. Respond with a JSON object like {\"items\": [\"apples\"]}.",
             },
             { "role": "user", "content": text },
         ]
