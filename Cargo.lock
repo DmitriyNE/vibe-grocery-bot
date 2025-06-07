@@ -1988,6 +1988,7 @@ dependencies = [
  "proptest",
  "reqwest",
  "serde",
+ "serde_json",
  "sqlx",
  "teloxide",
  "tokio",

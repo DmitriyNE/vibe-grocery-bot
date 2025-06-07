@@ -18,7 +18,8 @@ pub async fn help(bot: Bot, msg: Message) -> Result<()> {
          /archive - Finalize and archive the current list, starting a new one.\n\
          /delete - Show a temporary panel to delete items from the list.\n\
          /share - Send the list as plain text for copying.\n\
-         /nuke - Completely delete the current list.",
+         /nuke - Completely delete the current list.\n\
+         /parse - Parse this message into items via GPT.",
     )
     .parse_mode(teloxide::types::ParseMode::Html)
     .await?;
@@ -102,7 +103,10 @@ pub fn parse_item_line(line: &str) -> Option<String> {
     }
 }
 
-use crate::stt::{parse_voice_items, transcribe_audio, SttConfig, DEFAULT_PROMPT};
+use crate::stt::{
+    parse_items, parse_items_gpt, parse_voice_items, parse_voice_items_gpt, transcribe_audio,
+    SttConfig, DEFAULT_PROMPT,
+};
 use futures_util::StreamExt;
 use teloxide::net::Download;
 
@@ -130,7 +134,13 @@ pub async fn add_items_from_voice(
 
     match transcribe_audio(&config.model, &config.api_key, Some(DEFAULT_PROMPT), &audio).await {
         Ok(text) => {
-            let items = parse_voice_items(&text);
+            let items = match parse_voice_items_gpt(&config.api_key, &text).await {
+                Ok(list) => list,
+                Err(err) => {
+                    tracing::warn!("gpt parsing failed: {}", err);
+                    parse_voice_items(&text)
+                }
+            };
             let mut added = 0;
             for item in items {
                 add_item(&db, msg.chat.id, &item).await?;
@@ -172,6 +182,48 @@ pub async fn add_items_from_text(bot: Bot, msg: Message, db: Pool<Sqlite>) -> Re
             send_list(bot, msg.chat.id, &db).await?;
         }
     }
+    Ok(())
+}
+
+pub async fn add_items_from_parsed_text(
+    bot: Bot,
+    msg: Message,
+    db: Pool<Sqlite>,
+    stt: Option<SttConfig>,
+) -> Result<()> {
+    let Some(config) = stt else {
+        bot.send_message(msg.chat.id, "GPT parsing is disabled.")
+            .await?;
+        return Ok(());
+    };
+
+    let Some(text) = msg.text() else {
+        return Ok(());
+    };
+
+    let items = match parse_items_gpt(&config.api_key, text).await {
+        Ok(list) => list,
+        Err(err) => {
+            tracing::warn!("gpt parsing failed: {}", err);
+            parse_items(text)
+        }
+    };
+
+    let mut added = 0;
+    for item in items {
+        add_item(&db, msg.chat.id, &item).await?;
+        added += 1;
+    }
+
+    if added > 0 {
+        tracing::info!(
+            "Added {} item(s) via /parse for chat {}",
+            added,
+            msg.chat.id
+        );
+        send_list(bot, msg.chat.id, &db).await?;
+    }
+
     Ok(())
 }
 
