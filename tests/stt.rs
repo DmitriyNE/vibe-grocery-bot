@@ -1,4 +1,4 @@
-use shopbot::stt::transcribe_audio_test;
+use shopbot::ai::stt::transcribe_audio_test;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 

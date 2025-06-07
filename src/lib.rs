@@ -4,17 +4,17 @@ use sqlx::{Pool, Sqlite};
 use std::env; // Import the standard library's env module
 use teloxide::{prelude::*, utils::command::BotCommands};
 
+pub mod ai;
 mod db;
 mod handlers;
-pub mod stt;
 
+pub use ai::stt::{parse_items, parse_voice_items};
 pub use db::Item;
 pub use handlers::{format_delete_list, format_list, format_plain_list, parse_item_line};
-pub use stt::{parse_items, parse_voice_items};
 
 use handlers::{
-    add_items_from_parsed_text, add_items_from_text, add_items_from_voice, archive,
-    callback_handler, enter_delete_mode, help, nuke_list, send_list, share_list,
+    add_items_from_parsed_text, add_items_from_photo, add_items_from_text, add_items_from_voice,
+    archive, callback_handler, enter_delete_mode, help, nuke_list, send_list, share_list,
 };
 // ──────────────────────────────────────────────────────────────
 // Main application setup
@@ -29,13 +29,13 @@ pub async fn run() -> Result<()> {
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
-    tracing::info!("Starting grocery list bot...");
+    tracing::info!("Starting list bot...");
 
     let bot = Bot::from_env();
 
     // Optional OpenAI speech-to-text configuration
     let stt_config = match env::var("OPENAI_API_KEY") {
-        Ok(key) => Some(crate::stt::SttConfig {
+        Ok(key) => Some(crate::ai::stt::SttConfig {
             api_key: key,
             model: env::var("OPENAI_STT_MODEL").unwrap_or_else(|_| "whisper-1".to_string()),
         }),
@@ -103,12 +103,17 @@ pub async fn run() -> Result<()> {
                         .filter(|msg: Message| msg.voice().is_some())
                         .endpoint(add_items_from_voice),
                 )
+                .branch(
+                    dptree::entry()
+                        .filter(|msg: Message| msg.photo().is_some())
+                        .endpoint(add_items_from_photo),
+                )
                 .branch(dptree::entry().filter_command::<Command>().endpoint(
                     |bot: Bot,
                      msg: Message,
                      cmd: Command,
                      db: Pool<Sqlite>,
-                     stt_config: Option<crate::stt::SttConfig>| async move {
+                     stt_config: Option<crate::ai::stt::SttConfig>| async move {
                         match cmd {
                             Command::Start | Command::Help => help(bot, msg).await?,
                             Command::List => send_list(bot, msg.chat.id, &db).await?,
