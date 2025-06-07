@@ -5,7 +5,7 @@ use tracing::instrument;
 /// Use the OpenAI Chat API to parse items from arbitrary text.
 ///
 /// The model is instructed to return a JSON object with an `items` array. The
-/// returned list is cleaned with [`crate::handlers::parse_item_line`].
+/// returned list is cleaned with [`crate::text_utils::parse_item_line`].
 #[instrument(level = "trace", skip(api_key))]
 pub async fn parse_items_gpt(api_key: &str, text: &str) -> Result<Vec<String>> {
     parse_items_gpt_inner(api_key, text, OPENAI_CHAT_URL).await

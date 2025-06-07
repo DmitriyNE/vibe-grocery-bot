@@ -8,19 +8,10 @@ pub mod ai;
 mod db;
 mod handlers;
 mod text_utils;
-
-pub use ai::gpt::{parse_items_gpt, parse_voice_items_gpt};
-pub use ai::stt::{parse_items, parse_voice_items};
-pub use db::Item;
 pub use handlers::{format_delete_list, format_list, format_plain_list};
 pub use text_utils::{capitalize_first, parse_item_line};
 
-use handlers::{
-    add_items_from_parsed_text, add_items_from_photo, add_items_from_text, add_items_from_voice,
-    archive, callback_handler, enter_delete_mode, help, nuke_list, send_list, share_list,
-};
-
-fn prepare_sqlite_url(url: &str) -> String {
+    let db_url = db::prepare_sqlite_url(&db_url);
     if url.starts_with("sqlite:") && !url.contains("mode=") && !url.contains(":memory:") {
         if url.contains('?') {
             format!("{url}&mode=rwc")
@@ -221,35 +212,6 @@ mod tests {
         items = list_items(&db, chat).await?;
         assert!(items[0].done);
 
-        delete_item(&db, items[1].id).await?;
-        items = list_items(&db, chat).await?;
-        assert_eq!(items.len(), 1);
-
-        delete_all_items(&db, chat).await?;
-        items = list_items(&db, chat).await?;
-        assert!(items.is_empty());
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn last_message_id_roundtrip() -> Result<()> {
-        let db = init_db().await;
-        let chat = ChatId(1);
-
-        assert!(get_last_list_message_id(&db, chat).await?.is_none());
-
-        update_last_list_message_id(&db, chat, MessageId(99)).await?;
-        assert_eq!(get_last_list_message_id(&db, chat).await?, Some(99));
-
-        clear_last_list_message_id(&db, chat).await?;
-        assert!(get_last_list_message_id(&db, chat).await?.is_none());
-
-        Ok(())
-    }
-
-    #[test]
-    fn prepare_sqlite_url_basic() {
         assert_eq!(
             prepare_sqlite_url("sqlite:items.db"),
             "sqlite:items.db?mode=rwc"

@@ -6,7 +6,13 @@ use teloxide::{
     types::{ChatId, InlineKeyboardButton, InlineKeyboardMarkup, MessageId, UserId},
 };
 
+use crate::ai::gpt::{parse_items_gpt, parse_voice_items_gpt};
+use crate::ai::stt::{parse_items, parse_voice_items, transcribe_audio, SttConfig, DEFAULT_PROMPT};
+use crate::ai::vision::parse_photo_items;
 use crate::db::*;
+use crate::text_utils::{capitalize_first, parse_item_line};
+use futures_util::StreamExt;
+use teloxide::net::Download;
 use crate::text_utils::{capitalize_first, parse_item_line};
 
 pub async fn help(bot: Bot, msg: Message) -> Result<()> {
@@ -66,46 +72,6 @@ pub fn format_delete_list(
     for item in items {
         let button_text = if selected.contains(&item.id) {
             format!("❌ {}", item.text)
-        } else {
-            format!("⬜ {}", item.text)
-        };
-        let callback_data = format!("delete_{}", item.id);
-        keyboard_buttons.push(vec![InlineKeyboardButton::callback(
-            button_text,
-            callback_data,
-        )]);
-    }
-
-    keyboard_buttons.push(vec![InlineKeyboardButton::callback(
-        "🗑️ Done Deleting",
-        "delete_done",
-    )]);
-
-    (text, InlineKeyboardMarkup::new(keyboard_buttons))
-}
-
-pub fn format_plain_list(items: &[Item]) -> String {
-    let mut text = String::new();
-    for item in items {
-        text.push_str(&format!("• {}\n", item.text));
-    }
-    text
-}
-
-/// Clean a single text line from a user message.
-///
-/// Returns `None` if the line should be ignored (for example it is the
-/// archived list separator or becomes empty after trimming). Otherwise returns
-/// the cleaned line without leading status emojis or whitespace.
-pub fn parse_item_line(line: &str) -> Option<String> {
-    tracing::trace!(?line, "Parsing item line");
-    if line.trim() == "--- Archived List ---" {
-        tracing::trace!("Ignoring archived list separator");
-        return None;
-    }
-
-    let cleaned = line
-        .trim_start_matches(['☑', '✅', '⬜', '🛒', '\u{fe0f}'])
         .trim();
 
     if cleaned.is_empty() {
