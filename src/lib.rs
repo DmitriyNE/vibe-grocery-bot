@@ -6,13 +6,15 @@ use teloxide::{prelude::*, utils::command::BotCommands};
 
 mod db;
 mod handlers;
+pub mod stt;
 
 pub use db::Item;
 pub use handlers::{format_delete_list, format_list, format_plain_list, parse_item_line};
+pub use stt::parse_voice_items;
 
 use handlers::{
-    add_items_from_text, archive, callback_handler, enter_delete_mode, help, nuke_list, send_list,
-    share_list,
+    add_items_from_text, add_items_from_voice, archive, callback_handler, enter_delete_mode, help,
+    nuke_list, send_list, share_list,
 };
 // ──────────────────────────────────────────────────────────────
 // Main application setup
@@ -30,6 +32,15 @@ pub async fn run() -> Result<()> {
     tracing::info!("Starting grocery list bot...");
 
     let bot = Bot::from_env();
+
+    // Optional OpenAI speech-to-text configuration
+    let stt_config = match env::var("OPENAI_API_KEY") {
+        Ok(key) => Some(crate::stt::SttConfig {
+            api_key: key,
+            model: env::var("OPENAI_STT_MODEL").unwrap_or_else(|_| "whisper-1".to_string()),
+        }),
+        Err(_) => None,
+    };
 
     // --- SQLite Pool ---
     // Read the database URL from the environment, with a fallback for local dev.
@@ -85,6 +96,11 @@ pub async fn run() -> Result<()> {
         .branch(Update::filter_callback_query().endpoint(callback_handler))
         .branch(
             Update::filter_message()
+                .branch(
+                    dptree::entry()
+                        .filter(|msg: Message| msg.voice().is_some())
+                        .endpoint(add_items_from_voice),
+                )
                 .branch(dptree::entry().filter_command::<Command>().endpoint(
                     |bot: Bot, msg: Message, cmd: Command, db: Pool<Sqlite>| async move {
                         match cmd {
@@ -103,7 +119,7 @@ pub async fn run() -> Result<()> {
 
     // --- Dispatcher ---
     Dispatcher::builder(bot, handler)
-        .dependencies(dptree::deps![db])
+        .dependencies(dptree::deps![db, stt_config])
         .enable_ctrlc_handler()
         .build()
         .dispatch()

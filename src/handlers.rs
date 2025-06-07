@@ -102,6 +102,57 @@ pub fn parse_item_line(line: &str) -> Option<String> {
     }
 }
 
+use crate::stt::{parse_voice_items, transcribe_audio, SttConfig, DEFAULT_PROMPT};
+use futures_util::StreamExt;
+use teloxide::net::Download;
+
+pub async fn add_items_from_voice(
+    bot: Bot,
+    msg: Message,
+    db: Pool<Sqlite>,
+    stt: Option<SttConfig>,
+) -> Result<()> {
+    let Some(config) = stt else {
+        return Ok(());
+    };
+
+    let voice = match msg.voice() {
+        Some(v) => v,
+        None => return Ok(()),
+    };
+
+    let file = bot.get_file(&voice.file.id).await?;
+    let mut audio = Vec::new();
+    let mut stream = bot.download_file_stream(&file.path);
+    while let Some(chunk) = stream.next().await {
+        audio.extend_from_slice(&chunk?);
+    }
+
+    match transcribe_audio(&config.model, &config.api_key, Some(DEFAULT_PROMPT), &audio).await {
+        Ok(text) => {
+            let items = parse_voice_items(&text);
+            let mut added = 0;
+            for item in items {
+                add_item(&db, msg.chat.id, &item).await?;
+                added += 1;
+            }
+            if added > 0 {
+                tracing::info!(
+                    "Added {} item(s) from voice for chat {}",
+                    added,
+                    msg.chat.id
+                );
+                send_list(bot, msg.chat.id, &db).await?;
+            }
+        }
+        Err(err) => {
+            tracing::warn!("transcription failed: {}", err);
+        }
+    }
+
+    Ok(())
+}
+
 pub async fn add_items_from_text(bot: Bot, msg: Message, db: Pool<Sqlite>) -> Result<()> {
     if let Some(text) = msg.text() {
         let mut items_added_count = 0;
