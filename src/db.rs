@@ -46,6 +46,18 @@ fn join_selected(set: &HashSet<i64>) -> String {
         .join(",")
 }
 
+pub fn prepare_sqlite_url(url: &str) -> String {
+    if url.starts_with("sqlite:") && !url.contains("mode=") && !url.contains(":memory:") {
+        if url.contains('?') {
+            format!("{url}&mode=rwc")
+        } else {
+            format!("{url}?mode=rwc")
+        }
+    } else {
+        url.to_string()
+    }
+}
+
 pub async fn connect_db(db_url: &str) -> Result<Pool<Sqlite>> {
     tracing::debug!(db_url = %db_url, "Connecting to database");
     Ok(SqlitePoolOptions::new()
@@ -275,6 +287,35 @@ mod tests {
         let joined = join_selected(&original);
         let parsed = parse_selected(&joined);
         assert_eq!(original, parsed);
+    }
+
+    #[test]
+    fn prepare_sqlite_url_basic() {
+        assert_eq!(
+            prepare_sqlite_url("sqlite:items.db"),
+            "sqlite:items.db?mode=rwc"
+        );
+    }
+
+    #[test]
+    fn prepare_sqlite_url_with_query() {
+        assert_eq!(
+            prepare_sqlite_url("sqlite:items.db?cache=shared"),
+            "sqlite:items.db?cache=shared&mode=rwc"
+        );
+    }
+
+    #[test]
+    fn prepare_sqlite_url_existing_mode() {
+        assert_eq!(
+            prepare_sqlite_url("sqlite:items.db?mode=ro"),
+            "sqlite:items.db?mode=ro"
+        );
+    }
+
+    #[test]
+    fn prepare_sqlite_url_memory() {
+        assert_eq!(prepare_sqlite_url("sqlite::memory:"), "sqlite::memory:");
     }
 
     proptest! {
