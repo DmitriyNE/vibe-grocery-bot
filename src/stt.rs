@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Result};
 use reqwest::multipart::{Form, Part};
 use serde::Deserialize;
+use tracing::{debug, instrument, trace, warn};
 
 #[derive(Clone)]
 pub struct SttConfig {
@@ -18,6 +19,7 @@ struct TranscriptionResponse {
 
 const OPENAI_URL: &str = "https://api.openai.com/v1/audio/transcriptions";
 
+#[instrument(level = "trace", skip(api_key, bytes))]
 async fn transcribe_audio_inner(
     model: &str,
     api_key: &str,
@@ -33,6 +35,8 @@ async fn transcribe_audio_inner(
         form = form.text("prompt", p.to_string());
     }
 
+    debug!(model, prompt=?prompt, url, "sending transcription request");
+
     let client = reqwest::Client::new();
     let resp = client
         .post(url)
@@ -44,13 +48,16 @@ async fn transcribe_audio_inner(
     if !resp.status().is_success() {
         let status = resp.status();
         let err_text = resp.text().await.unwrap_or_default();
+        warn!(%status, "OpenAI API error");
         return Err(anyhow!("OpenAI API error {status}: {err_text}"));
     }
 
     let data: TranscriptionResponse = resp.json().await?;
+    trace!(transcription = %data.text, "transcription successful");
     Ok(data.text)
 }
 
+#[instrument(level = "trace", skip(api_key, bytes))]
 pub async fn transcribe_audio(
     model: &str,
     api_key: &str,
@@ -61,6 +68,7 @@ pub async fn transcribe_audio(
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
+#[instrument(level = "trace", skip(api_key, bytes))]
 pub async fn transcribe_audio_test(
     model: &str,
     api_key: &str,
@@ -119,16 +127,19 @@ const OPENAI_CHAT_URL: &str = "https://api.openai.com/v1/chat/completions";
 ///
 /// The model is instructed to return a JSON object with an `items` array. The
 /// returned list is cleaned with [`crate::handlers::parse_item_line`].
+#[instrument(level = "trace", skip(api_key))]
 pub async fn parse_items_gpt(api_key: &str, text: &str) -> Result<Vec<String>> {
     parse_items_gpt_inner(api_key, text, OPENAI_CHAT_URL).await
 }
 
 /// Legacy wrapper for [`parse_items_gpt`] used by voice message handling.
+#[instrument(level = "trace", skip(api_key))]
 pub async fn parse_voice_items_gpt(api_key: &str, text: &str) -> Result<Vec<String>> {
     parse_items_gpt(api_key, text).await
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
+#[instrument(level = "trace", skip(api_key))]
 pub async fn parse_items_gpt_inner(api_key: &str, text: &str, url: &str) -> Result<Vec<String>> {
     let body = serde_json::json!({
         "model": "gpt-3.5-turbo",
@@ -142,6 +153,8 @@ pub async fn parse_items_gpt_inner(api_key: &str, text: &str, url: &str) -> Resu
         ]
     });
 
+    debug!(url, "sending chat completion request");
+
     let client = reqwest::Client::new();
     let resp = client
         .post(url)
@@ -153,10 +166,13 @@ pub async fn parse_items_gpt_inner(api_key: &str, text: &str, url: &str) -> Resu
     if !resp.status().is_success() {
         let status = resp.status();
         let err_text = resp.text().await.unwrap_or_default();
+        warn!(%status, "OpenAI API error");
         return Err(anyhow!("OpenAI API error {status}: {err_text}"));
     }
 
-    let chat: ChatResponse = resp.json().await?;
+    let raw = resp.text().await?;
+    trace!(raw = %raw, "chat response");
+    let chat: ChatResponse = serde_json::from_str(&raw)?;
     let content = chat
         .choices
         .first()
@@ -176,11 +192,13 @@ pub async fn parse_items_gpt_inner(api_key: &str, text: &str, url: &str) -> Resu
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
+#[instrument(level = "trace", skip(api_key))]
 pub async fn parse_items_gpt_test(api_key: &str, text: &str, url: &str) -> Result<Vec<String>> {
     parse_items_gpt_inner(api_key, text, url).await
 }
 
 /// Legacy wrapper for [`parse_items_gpt_test`].
+#[instrument(level = "trace", skip(api_key))]
 pub async fn parse_voice_items_gpt_test(
     api_key: &str,
     text: &str,
