@@ -6,7 +6,7 @@ dockerfile = 'Dockerfile'
 image_tag = "latest"
 
 [env]
-RUST_LOG = 'info'
+RUST_LOG = 'trace'
 DB_URL = 'sqlite:///data/shopping.db'
 
 [[mounts]]
