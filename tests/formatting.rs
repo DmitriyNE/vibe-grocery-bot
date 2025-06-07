@@ -1,4 +1,4 @@
-use shopbot::{format_delete_list, format_list, Item};
+use shopbot::{format_delete_list, format_list, format_plain_list, Item};
 
 fn sample_items() -> Vec<Item> {
     vec![
@@ -47,4 +47,11 @@ fn test_format_delete_list() {
         .map(|row| row[0].text.as_str())
         .collect();
     assert_eq!(labels, vec!["☑️ Apples", "❌ Milk", "✅ Done Deleting"]);
+}
+
+#[test]
+fn test_format_plain_list() {
+    let items = sample_items();
+    let text = format_plain_list(&items);
+    assert_eq!(text, "• Apples\n• Milk\n");
 }
