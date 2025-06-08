@@ -10,7 +10,9 @@ pub struct SttConfig {
 }
 
 /// Default instructions passed to GPT-based transcription models.
-pub const DEFAULT_PROMPT: &str = "List the items mentioned, separated by commas or the word 'and'.";
+/// The prompt also asks the model to keep spoken numbers intact so they aren't
+/// discarded during transcription.
+pub const DEFAULT_PROMPT: &str = "List the items mentioned, separated by commas or the word 'and'. Preserve numbers exactly as spoken.";
 
 #[derive(Deserialize)]
 struct TranscriptionResponse {

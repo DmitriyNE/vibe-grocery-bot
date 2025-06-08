@@ -26,7 +26,7 @@ pub async fn parse_items_gpt_inner(api_key: &str, text: &str, url: &str) -> Resu
         "messages": [
             {
                 "role": "system",
-                "content": "Extract the items from the user's text. Respond with a JSON object like {\"items\": [\"apples\"]}.",
+                "content": "Extract the items from the user's text. Preserve numbers exactly as provided, such as '1 milk'. Respond with a JSON object like {\"items\": [\"1 milk\"]}.",
             },
             { "role": "user", "content": text },
         ]

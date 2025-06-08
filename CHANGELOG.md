@@ -9,6 +9,8 @@ All notable changes to this project will be documented in this file.
 4. Deletion mode highlights selections with red crosses, shows empty squares for
    unselected items, and uses a trashcan icon to finish.
 5. Reduced noisy HTTP logs by setting the `hyper` log level to info in `fly.toml`.
+6. Voice transcription uses an improved prompt so numbers like "1 milk" are preserved.
+7. GPT item extraction keeps numbers intact, preventing "1 milk" becoming "milk".
 
 
 ## [0.1.0] - 2025-06-07
