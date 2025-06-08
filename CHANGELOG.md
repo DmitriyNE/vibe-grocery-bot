@@ -3,6 +3,8 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+
+## [0.3.0] - 2025-06-09
 1. `/info` command shows commit hash and release version or how many commits the build is ahead of the latest release
 2. Remove items via voice commands like "delete milk". The bot replies with a copyable list of the deleted entries.
 3. Voice requests prefer nominative item names and numeric quantities when interpreting additions.
