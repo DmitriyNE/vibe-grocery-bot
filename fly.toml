@@ -9,6 +9,7 @@ image_tag = "latest"
 RUST_LOG = 'trace,hyper=info'
 DB_URL = 'sqlite:///data/shopping.db'
 OPENAI_STT_MODEL = 'gpt-4o-transcribe'
+OPENAI_GPT_MODEL = 'gpt-4.1'
 
 [[mounts]]
 source = 'shopbot_db'

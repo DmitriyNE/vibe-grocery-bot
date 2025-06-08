@@ -37,6 +37,7 @@ Set these environment variables before running:
 - `RUST_LOG` – optional logging level (e.g. `info` or `debug`)
 - `OPENAI_API_KEY` – optional API key for enabling voice and photo recognition
 - `OPENAI_STT_MODEL` – optional model name (`whisper-1`, `gpt-4o-mini-transcribe`, or `gpt-4o-transcribe`)
+- `OPENAI_GPT_MODEL` – optional chat model name (defaults to `gpt-4.1`)
 
 The database file is created automatically if needed. Embedded SQLx migrations in the `migrations/` directory are executed on startup.
 

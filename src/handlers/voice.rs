@@ -62,7 +62,9 @@ pub async fn add_items_from_voice(
             }
             let mut current = list_items(&db, msg.chat.id).await?;
             let list_texts: Vec<String> = current.iter().map(|i| i.text.clone()).collect();
-            match interpret_voice_command(&config.api_key, &text, &list_texts).await {
+            match interpret_voice_command(&config.api_key, &config.gpt_model, &text, &list_texts)
+                .await
+            {
                 Ok(VoiceCommand::Add(items)) => {
                     let mut added = 0;
                     for item in items {
