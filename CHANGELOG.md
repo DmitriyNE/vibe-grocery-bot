@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+1. Add index on `items.chat_id` to speed up queries.
 
 ## [0.3.0] - 2025-06-09
 1. `/info` command shows commit hash and release version or how many commits the build is ahead of the latest release
