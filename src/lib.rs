@@ -15,7 +15,7 @@ pub use ai::stt::{parse_items, parse_voice_items};
 pub use db::Item;
 pub use handlers::{format_delete_list, format_list, format_plain_list};
 pub use system_info::get_system_info;
-pub use text_utils::{capitalize_first, parse_item_line};
+pub use text_utils::{capitalize_first, normalize_for_match, parse_item_line};
 
 use handlers::{
     add_items_from_parsed_text, add_items_from_photo, add_items_from_text, add_items_from_voice,

@@ -6,7 +6,7 @@ use teloxide::{net::Download, prelude::*};
 use crate::ai::gpt::{interpret_voice_command, VoiceCommand};
 use crate::ai::stt::{parse_voice_items, transcribe_audio, SttConfig, DEFAULT_PROMPT};
 use crate::db::{add_item, delete_item, list_items};
-use crate::text_utils::capitalize_first;
+use crate::text_utils::{capitalize_first, normalize_for_match};
 
 use super::list::send_list;
 
@@ -56,7 +56,11 @@ pub async fn add_items_from_voice(
                 Ok(VoiceCommand::Delete(items)) => {
                     let mut deleted = Vec::new();
                     for item in items {
-                        if let Some(found) = current.iter().find(|i| i.text == item) {
+                        let needle = normalize_for_match(&item);
+                        if let Some(found) = current
+                            .iter()
+                            .find(|i| normalize_for_match(&i.text) == needle)
+                        {
                             delete_item(&db, found.id).await?;
                             deleted.push(found.text.clone());
                         }

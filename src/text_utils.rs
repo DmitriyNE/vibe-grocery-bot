@@ -38,3 +38,17 @@ pub fn capitalize_first(text: &str) -> String {
         None => String::new(),
     }
 }
+
+/// Normalize an item string for matching operations.
+///
+/// This removes any leading quantity digits and whitespace and
+/// lowercases the rest so lookups are more tolerant to voice command
+/// variations.
+pub fn normalize_for_match(text: &str) -> String {
+    let trimmed = text
+        .trim_start_matches(|c: char| c.is_ascii_digit() || c.is_whitespace())
+        .trim();
+    let result = trimmed.to_lowercase();
+    trace!(original = %text, normalized = %result, "normalized for match");
+    result
+}
