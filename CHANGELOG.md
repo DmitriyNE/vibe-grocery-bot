@@ -3,7 +3,6 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
-1. GitHub Actions caches cargo dependencies for faster builds.
 
 ## [0.2.0] - 2025-06-08
 1. Add items by sending a photo using OpenAI vision to detect items automatically.
