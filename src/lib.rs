@@ -7,17 +7,20 @@ use teloxide::{prelude::*, utils::command::BotCommands};
 pub mod ai;
 mod db;
 mod handlers;
+mod system_info;
 mod text_utils;
 
 pub use ai::gpt::{parse_items_gpt, parse_voice_items_gpt};
 pub use ai::stt::{parse_items, parse_voice_items};
 pub use db::Item;
 pub use handlers::{format_delete_list, format_list, format_plain_list};
+pub use system_info::get_system_info;
 pub use text_utils::{capitalize_first, parse_item_line};
 
 use handlers::{
     add_items_from_parsed_text, add_items_from_photo, add_items_from_text, add_items_from_voice,
     archive, callback_handler, enter_delete_mode, help, nuke_list, send_list, share_list,
+    show_system_info,
 };
 
 // ──────────────────────────────────────────────────────────────
@@ -85,6 +88,8 @@ pub async fn run() -> Result<()> {
         Nuke,
         #[command(description = "parse items from the given text using GPT.")]
         Parse,
+        #[command(description = "show system information.")]
+        Info,
     }
 
     // --- Handler Setup ---
@@ -118,6 +123,7 @@ pub async fn run() -> Result<()> {
                             Command::Parse => {
                                 add_items_from_parsed_text(bot, msg, db, stt_config).await?
                             }
+                            Command::Info => show_system_info(bot, msg).await?,
                         }
                         Ok(())
                     },

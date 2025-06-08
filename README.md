@@ -14,6 +14,7 @@ Send any message to the bot. Every non-empty line becomes an item. If you send a
 - `/share` – send the list as plain text
 - `/nuke` – wipe the list completely
 - `/parse` – let GPT parse this message into items
+- `/info` – show commit hash and whether the build is on a release or how far it is ahead of the latest release
 
 ## Installation
 

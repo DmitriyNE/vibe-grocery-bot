@@ -20,7 +20,8 @@ pub async fn help(bot: Bot, msg: Message) -> Result<()> {
              /delete - Show a temporary panel to delete items from the list.\n\
              /share - Send the list as plain text for copying.\n\
              /nuke - Completely delete the current list.\n\
-             /parse - Parse this message into items via GPT.",
+             /parse - Parse this message into items via GPT.\n\
+             /info - Show system information.",
     )
     .parse_mode(teloxide::types::ParseMode::Html)
     .await?;
