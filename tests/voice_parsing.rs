@@ -7,4 +7,7 @@ fn test_parse_items() {
 
     let single = parse_items("just apples");
     assert_eq!(single, vec!["just apples"]);
+
+    let numbers = parse_items("one milk, 2 eggs");
+    assert_eq!(numbers, vec!["one milk", "2 eggs"]);
 }
