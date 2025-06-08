@@ -24,11 +24,14 @@ pub async fn add_items_from_photo(
         Some(p) => p,
         None => return Ok(()),
     };
-    let file_id = photo_sizes
+    let Some(file_id) = photo_sizes
         .iter()
         .max_by_key(|p| p.file.size)
         .map(|p| &p.file.id)
-        .unwrap();
+    else {
+        tracing::debug!("photo had no usable sizes");
+        return Ok(());
+    };
 
     let file = bot.get_file(file_id).await?;
     let mut bytes = Vec::new();
@@ -62,4 +65,57 @@ pub async fn add_items_from_photo(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sqlx::{sqlite::SqlitePoolOptions, Pool, Sqlite};
+
+    async fn init_db() -> Pool<Sqlite> {
+        let db = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+
+        sqlx::query(
+            "CREATE TABLE items(\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    chat_id INTEGER NOT NULL,\n    text TEXT NOT NULL,\n    done BOOLEAN NOT NULL DEFAULT 0\n)",
+        )
+        .execute(&db)
+        .await
+        .unwrap();
+
+        sqlx::query(
+            "CREATE TABLE chat_state(\n    chat_id INTEGER PRIMARY KEY,\n    last_list_message_id INTEGER\n)",
+        )
+        .execute(&db)
+        .await
+        .unwrap();
+
+        sqlx::query(
+            "CREATE TABLE delete_session(\n    user_id INTEGER PRIMARY KEY,\n    chat_id INTEGER NOT NULL,\n    selected TEXT NOT NULL DEFAULT '',\n    notice_chat_id INTEGER,\n    notice_message_id INTEGER,\n    dm_message_id INTEGER\n)",
+        )
+        .execute(&db)
+        .await
+        .unwrap();
+
+        db
+    }
+
+    #[tokio::test]
+    async fn photo_with_no_sizes_returns_ok() {
+        let db = init_db().await;
+        let bot = Bot::new("test");
+        let json = r#"{"message_id":1,"date":0,"chat":{"id":1,"type":"private"},"photo":[]}"#;
+        let msg: Message = serde_json::from_str(json).unwrap();
+        let stt = Some(SttConfig {
+            api_key: "k".into(),
+            model: "m".into(),
+            gpt_model: "g".into(),
+        });
+
+        let res = add_items_from_photo(bot, msg, db, stt).await;
+        assert!(res.is_ok());
+    }
 }
