@@ -6,7 +6,7 @@ Vibe Grocery Bot is a small Telegram bot for managing a shared shopping list. Ea
 
 ## Usage
 
-Send any message to the bot. Every non-empty line becomes an item. If you send a voice or photo message and an OpenAI API key is configured, the bot will try to recognize items automatically. A voice command like "delete milk and bread" removes those entries and the bot confirms with a list starting with a trashcan emoji. The bot responds with a list message containing checkbox buttons so you can mark things bought. The main commands are:
+Send any message to the bot. Every non-empty line becomes an item. If you send a voice or photo message and an OpenAI API key is configured, the bot will try to recognize items automatically. A voice command like "delete milk and bread" removes those entries and the bot confirms with a list starting with a trashcan emoji. You can copy that message back to undo the deletion. The bot responds with a list message containing checkbox buttons so you can mark things bought. The main commands are:
 
 - `/list` – show the list again
 - `/archive` – archive the current list and start a new one

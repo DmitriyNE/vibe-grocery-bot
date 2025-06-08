@@ -15,4 +15,6 @@ fn test_parse_item_line() {
     assert_eq!(parse_item_line("☑️   "), None);
     // Bullet prefix
     assert_eq!(parse_item_line("• Milk"), Some("Milk".to_string()));
+    // Voice deletion header
+    assert_eq!(parse_item_line("🗑 Removed via voice request:"), None);
 }
