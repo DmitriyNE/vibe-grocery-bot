@@ -85,9 +85,10 @@ pub async fn interpret_voice_command_inner(
     } else {
         format!("Current items: {}.", list.join(", "))
     };
+    let list_json = serde_json::to_string(list)?;
 
     let prompt = format!(
-        "You manage a list of items. {list_text} Decide whether the user's request adds items or removes items from the list. Return a JSON object like {{\"add\":[...]}} or {{\"delete\":[...]}}. For deletions, only include items exactly as they appear in the list. If unsure, treat it as an addition request. Use nominative forms for item names when possible and prefer digits for quantities."
+        "You manage a list of items. {list_text} The list as JSON is {list_json}. Decide whether the user's request adds items or removes items from the list. Return a JSON object like {{\"add\":[...]}} or {{\"delete\":[...]}}. For deletions, include each item exactly as it appears in the list, including any leading quantities. If unsure, treat it as an addition request. Use nominative forms for item names when possible and prefer digits for quantities."
     );
 
     let body = serde_json::json!({
