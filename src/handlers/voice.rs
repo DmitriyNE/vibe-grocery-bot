@@ -34,6 +34,10 @@ pub async fn add_items_from_voice(
 
     match transcribe_audio(&config.model, &config.api_key, Some(DEFAULT_PROMPT), &audio).await {
         Ok(text) => {
+            if text.trim().is_empty() {
+                tracing::debug!("voice transcription empty; ignoring");
+                return Ok(());
+            }
             let current = list_items(&db, msg.chat.id).await?;
             let list_texts: Vec<String> = current.iter().map(|i| i.text.clone()).collect();
             match interpret_voice_command(&config.api_key, &text, &list_texts).await {

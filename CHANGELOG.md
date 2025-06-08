@@ -8,6 +8,8 @@ All notable changes to this project will be documented in this file.
 3. Voice requests prefer nominative item names and numeric quantities when interpreting additions.
 4. Voice command prompt now ensures deletions return items exactly as listed so numbers aren't dropped.
 5. Voice GPT prompt includes the list in JSON form to reduce misunderstandings.
+6. Empty voice transcriptions are ignored instead of confusing the GPT command
+   parser.
 
 ## [0.2.0] - 2025-06-08
 1. Add items by sending a photo using OpenAI vision to detect items automatically.
