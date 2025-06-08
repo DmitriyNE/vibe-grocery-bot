@@ -13,4 +13,6 @@ fn test_parse_item_line() {
     assert_eq!(parse_item_line("--- Archived List ---"), None);
     // Empty line when only an emoji and spaces
     assert_eq!(parse_item_line("☑️   "), None);
+    // Bullet prefix
+    assert_eq!(parse_item_line("• Milk"), Some("Milk".to_string()));
 }

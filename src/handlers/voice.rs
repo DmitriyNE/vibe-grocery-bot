@@ -3,9 +3,9 @@ use futures_util::StreamExt;
 use sqlx::{Pool, Sqlite};
 use teloxide::{net::Download, prelude::*};
 
-use crate::ai::gpt::parse_voice_items_gpt;
+use crate::ai::gpt::{interpret_voice_command, VoiceCommand};
 use crate::ai::stt::{parse_voice_items, transcribe_audio, SttConfig, DEFAULT_PROMPT};
-use crate::db::add_item;
+use crate::db::{add_item, delete_item, list_items};
 use crate::text_utils::capitalize_first;
 
 use super::list::send_list;
@@ -34,26 +34,64 @@ pub async fn add_items_from_voice(
 
     match transcribe_audio(&config.model, &config.api_key, Some(DEFAULT_PROMPT), &audio).await {
         Ok(text) => {
-            let items = match parse_voice_items_gpt(&config.api_key, &text).await {
-                Ok(list) => list,
-                Err(err) => {
-                    tracing::warn!("gpt parsing failed: {}", err);
-                    parse_voice_items(&text)
+            let current = list_items(&db, msg.chat.id).await?;
+            let list_texts: Vec<String> = current.iter().map(|i| i.text.clone()).collect();
+            match interpret_voice_command(&config.api_key, &text, &list_texts).await {
+                Ok(VoiceCommand::Add(items)) => {
+                    let mut added = 0;
+                    for item in items {
+                        let cap = capitalize_first(&item);
+                        add_item(&db, msg.chat.id, &cap).await?;
+                        added += 1;
+                    }
+                    if added > 0 {
+                        tracing::info!(
+                            "Added {} item(s) from voice for chat {}",
+                            added,
+                            msg.chat.id
+                        );
+                        send_list(bot.clone(), msg.chat.id, &db).await?;
+                    }
                 }
-            };
-            let mut added = 0;
-            for item in items {
-                let cap = capitalize_first(&item);
-                add_item(&db, msg.chat.id, &cap).await?;
-                added += 1;
-            }
-            if added > 0 {
-                tracing::info!(
-                    "Added {} item(s) from voice for chat {}",
-                    added,
-                    msg.chat.id
-                );
-                send_list(bot, msg.chat.id, &db).await?;
+                Ok(VoiceCommand::Delete(items)) => {
+                    let mut deleted = Vec::new();
+                    for item in items {
+                        if let Some(found) = current.iter().find(|i| i.text == item) {
+                            delete_item(&db, found.id).await?;
+                            deleted.push(found.text.clone());
+                        }
+                    }
+                    if !deleted.is_empty() {
+                        tracing::info!(
+                            "Deleted {} item(s) via voice for chat {}",
+                            deleted.len(),
+                            msg.chat.id
+                        );
+                        let lines: Vec<String> = deleted.iter().map(|t| format!("• {t}")).collect();
+                        let msg_text =
+                            format!("🗑 Removed via voice request:\n{}", lines.join("\n"));
+                        bot.send_message(msg.chat.id, msg_text).await?;
+                        send_list(bot.clone(), msg.chat.id, &db).await?;
+                    }
+                }
+                Err(err) => {
+                    tracing::warn!("gpt command failed: {}", err);
+                    let items = parse_voice_items(&text);
+                    let mut added = 0;
+                    for item in items {
+                        let cap = capitalize_first(&item);
+                        add_item(&db, msg.chat.id, &cap).await?;
+                        added += 1;
+                    }
+                    if added > 0 {
+                        tracing::info!(
+                            "Added {} item(s) from voice for chat {}",
+                            added,
+                            msg.chat.id
+                        );
+                        send_list(bot.clone(), msg.chat.id, &db).await?;
+                    }
+                }
             }
         }
         Err(err) => {
