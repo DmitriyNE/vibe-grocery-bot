@@ -13,7 +13,7 @@ RUN cargo chef prepare --recipe-path recipe.json
 FROM rust:1.87-slim AS cacher
 WORKDIR /app
 # Install system dependencies required for building crates like `openssl-sys`
-RUN apt-get update -qq && apt-get install -y --no-install-recommends pkg-config libssl-dev
+RUN apt-get update -qq && apt-get install -y --no-install-recommends git pkg-config libssl-dev
 RUN cargo install cargo-chef
 COPY --from=planner /app/recipe.json recipe.json
 # Build dependencies
@@ -25,7 +25,7 @@ RUN cargo chef cook --release --recipe-path recipe.json
 FROM rust:1.87-slim AS builder
 WORKDIR /app
 # Install system dependencies required for the final link
-RUN apt-get update -qq && apt-get install -y --no-install-recommends pkg-config libssl-dev
+RUN apt-get update -qq && apt-get install -y --no-install-recommends git pkg-config libssl-dev
 COPY . .
 # Copy over the pre-built dependencies from the cacher stage
 COPY --from=cacher /app/target target
