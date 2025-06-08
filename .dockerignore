@@ -1,6 +1,2 @@
 **/.env
 target
-fly.toml
-.dockerignore
-.gitignore
-.git
