@@ -7,21 +7,26 @@ use tracing::instrument;
 /// The model is instructed to return a JSON object with an `items` array. The
 /// returned list is cleaned with [`crate::text_utils::parse_item_line`].
 #[instrument(level = "trace", skip(api_key))]
-pub async fn parse_items_gpt(api_key: &str, text: &str) -> Result<Vec<String>> {
-    parse_items_gpt_inner(api_key, text, OPENAI_CHAT_URL).await
+pub async fn parse_items_gpt(api_key: &str, model: &str, text: &str) -> Result<Vec<String>> {
+    parse_items_gpt_inner(api_key, model, text, OPENAI_CHAT_URL).await
 }
 
 /// Legacy wrapper for [`parse_items_gpt`] used by voice message handling.
 #[instrument(level = "trace", skip(api_key))]
-pub async fn parse_voice_items_gpt(api_key: &str, text: &str) -> Result<Vec<String>> {
-    parse_items_gpt(api_key, text).await
+pub async fn parse_voice_items_gpt(api_key: &str, model: &str, text: &str) -> Result<Vec<String>> {
+    parse_items_gpt(api_key, model, text).await
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
 #[instrument(level = "trace", skip(api_key))]
-pub async fn parse_items_gpt_inner(api_key: &str, text: &str, url: &str) -> Result<Vec<String>> {
+pub async fn parse_items_gpt_inner(
+    api_key: &str,
+    model: &str,
+    text: &str,
+    url: &str,
+) -> Result<Vec<String>> {
     let body = serde_json::json!({
-        "model": "gpt-3.5-turbo",
+        "model": model,
         "response_format": { "type": "json_object" },
         "messages": [
             {
@@ -37,18 +42,24 @@ pub async fn parse_items_gpt_inner(api_key: &str, text: &str, url: &str) -> Resu
 
 #[cfg_attr(not(test), allow(dead_code))]
 #[instrument(level = "trace", skip(api_key))]
-pub async fn parse_items_gpt_test(api_key: &str, text: &str, url: &str) -> Result<Vec<String>> {
-    parse_items_gpt_inner(api_key, text, url).await
+pub async fn parse_items_gpt_test(
+    api_key: &str,
+    model: &str,
+    text: &str,
+    url: &str,
+) -> Result<Vec<String>> {
+    parse_items_gpt_inner(api_key, model, text, url).await
 }
 
 /// Legacy wrapper for [`parse_items_gpt_test`].
 #[instrument(level = "trace", skip(api_key))]
 pub async fn parse_voice_items_gpt_test(
     api_key: &str,
+    model: &str,
     text: &str,
     url: &str,
 ) -> Result<Vec<String>> {
-    parse_items_gpt_test(api_key, text, url).await
+    parse_items_gpt_test(api_key, model, text, url).await
 }
 
 #[derive(Debug, PartialEq)]
@@ -66,16 +77,18 @@ struct CommandJson {
 #[instrument(level = "trace", skip(api_key))]
 pub async fn interpret_voice_command(
     api_key: &str,
+    model: &str,
     text: &str,
     list: &[String],
 ) -> Result<VoiceCommand> {
-    interpret_voice_command_inner(api_key, text, list, OPENAI_CHAT_URL).await
+    interpret_voice_command_inner(api_key, model, text, list, OPENAI_CHAT_URL).await
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
 #[instrument(level = "trace", skip(api_key))]
 pub async fn interpret_voice_command_inner(
     api_key: &str,
+    model: &str,
     text: &str,
     list: &[String],
     url: &str,
@@ -92,7 +105,7 @@ pub async fn interpret_voice_command_inner(
     );
 
     let body = serde_json::json!({
-        "model": "gpt-3.5-turbo",
+        "model": model,
         "response_format": { "type": "json_object" },
         "messages": [
             { "role": "system", "content": prompt },
@@ -166,9 +179,10 @@ pub async fn interpret_voice_command_inner(
 #[instrument(level = "trace", skip(api_key))]
 pub async fn interpret_voice_command_test(
     api_key: &str,
+    model: &str,
     text: &str,
     list: &[String],
     url: &str,
 ) -> Result<VoiceCommand> {
-    interpret_voice_command_inner(api_key, text, list, url).await
+    interpret_voice_command_inner(api_key, model, text, list, url).await
 }

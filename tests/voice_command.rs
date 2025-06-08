@@ -17,6 +17,7 @@ async fn test_voice_command_delete() {
     let url = format!("{}/v1/chat/completions", server.uri());
     let res = interpret_voice_command_test(
         "k",
+        "gpt-4.1",
         "delete milk",
         &["Milk".to_string(), "Bread".to_string()],
         &url,
@@ -41,6 +42,7 @@ async fn test_voice_command_add() {
     let url = format!("{}/v1/chat/completions", server.uri());
     let res = interpret_voice_command_test(
         "k",
+        "gpt-4.1",
         "apples",
         &["Milk".to_string(), "Bread".to_string()],
         &url,

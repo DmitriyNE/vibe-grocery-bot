@@ -10,6 +10,8 @@ All notable changes to this project will be documented in this file.
 5. Voice GPT prompt includes the list in JSON form to reduce misunderstandings.
 6. Empty voice transcriptions are ignored instead of confusing the GPT command
    parser.
+7. GPT chat model is configurable via `OPENAI_GPT_MODEL` and now defaults to
+   `gpt-4.1`.
 
 ## [0.2.0] - 2025-06-08
 1. Add items by sending a photo using OpenAI vision to detect items automatically.

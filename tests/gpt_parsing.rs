@@ -15,7 +15,7 @@ async fn test_parse_items_gpt_numbers() {
         .await;
 
     let url = format!("{}/v1/chat/completions", server.uri());
-    let items = parse_items_gpt_test("k", "one milk and 2 eggs", &url)
+    let items = parse_items_gpt_test("k", "gpt-4.1", "one milk and 2 eggs", &url)
         .await
         .unwrap();
     assert_eq!(items, vec!["one milk", "2 eggs"]);
