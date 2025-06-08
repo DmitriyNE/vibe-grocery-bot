@@ -2,7 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.2.0] - Unreleased
+## Unreleased
+
+## [0.2.0] - 2025-06-08
 1. Add items by sending a photo using OpenAI vision to detect items automatically.
 2. Items show green checkmarks when the entire list is checked off.
 3. Checkbox icons indicate item status in the list.
