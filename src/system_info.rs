@@ -41,6 +41,6 @@ mod tests {
         let info = get_system_info();
         assert!(info.contains(expected));
         assert!(info.contains("Dev build") || info.contains("Release build"));
-        assert!(info.contains("release") || info.contains("commits ahead of"));
+        assert!(info.contains("release") || info.contains("development"));
     }
 }
