@@ -50,3 +50,124 @@ pub async fn parse_voice_items_gpt_test(
 ) -> Result<Vec<String>> {
     parse_items_gpt_test(api_key, text, url).await
 }
+
+#[derive(Debug, PartialEq)]
+pub enum VoiceCommand {
+    Add(Vec<String>),
+    Delete(Vec<String>),
+}
+
+#[derive(serde::Deserialize)]
+struct CommandJson {
+    add: Option<Vec<String>>,
+    delete: Option<Vec<String>>,
+}
+
+#[instrument(level = "trace", skip(api_key))]
+pub async fn interpret_voice_command(
+    api_key: &str,
+    text: &str,
+    list: &[String],
+) -> Result<VoiceCommand> {
+    interpret_voice_command_inner(api_key, text, list, OPENAI_CHAT_URL).await
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+#[instrument(level = "trace", skip(api_key))]
+pub async fn interpret_voice_command_inner(
+    api_key: &str,
+    text: &str,
+    list: &[String],
+    url: &str,
+) -> Result<VoiceCommand> {
+    let list_text = if list.is_empty() {
+        "The list is empty.".to_string()
+    } else {
+        format!("Current items: {}.", list.join(", "))
+    };
+
+    let prompt = format!(
+        "You manage a list of items. {list_text} Decide whether the user's request adds items or removes items from the list. Return a JSON object like {{\"add\":[...]}} or {{\"delete\":[...]}}. For deletions, only include items exactly as they appear in the list. If unsure, treat it as an addition request."
+    );
+
+    let body = serde_json::json!({
+        "model": "gpt-3.5-turbo",
+        "response_format": { "type": "json_object" },
+        "messages": [
+            { "role": "system", "content": prompt },
+            { "role": "user", "content": text },
+        ]
+    });
+
+    #[derive(serde::Deserialize)]
+    struct ChatChoice {
+        message: ChatMessage,
+    }
+    #[derive(serde::Deserialize)]
+    struct ChatMessage {
+        content: String,
+    }
+    #[derive(serde::Deserialize)]
+    struct ChatResponse {
+        choices: Vec<ChatChoice>,
+    }
+
+    use anyhow::{anyhow, Result};
+    use tracing::{debug, trace, warn};
+
+    debug!(url, "sending chat completion request");
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(url)
+        .bearer_auth(api_key)
+        .json(&body)
+        .send()
+        .await?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let err_text = resp.text().await.unwrap_or_default();
+        warn!(%status, "OpenAI API error");
+        return Err(anyhow!("OpenAI API error {status}: {err_text}"));
+    }
+
+    let raw = resp.text().await?;
+    trace!(raw = %raw, "chat response");
+    let chat: ChatResponse = serde_json::from_str(&raw)?;
+    let content = chat
+        .choices
+        .first()
+        .ok_or_else(|| anyhow!("missing chat choice"))?
+        .message
+        .content
+        .trim()
+        .to_string();
+
+    let cmd: CommandJson = serde_json::from_str(&content)?;
+
+    if let Some(delete) = cmd.delete {
+        let cleaned: Vec<String> = delete
+            .into_iter()
+            .filter_map(|s| crate::text_utils::parse_item_line(&s))
+            .collect();
+        Ok(VoiceCommand::Delete(cleaned))
+    } else {
+        let add = cmd.add.unwrap_or_default();
+        let cleaned: Vec<String> = add
+            .into_iter()
+            .filter_map(|s| crate::text_utils::parse_item_line(&s))
+            .collect();
+        Ok(VoiceCommand::Add(cleaned))
+    }
+}
+
+#[instrument(level = "trace", skip(api_key))]
+pub async fn interpret_voice_command_test(
+    api_key: &str,
+    text: &str,
+    list: &[String],
+    url: &str,
+) -> Result<VoiceCommand> {
+    interpret_voice_command_inner(api_key, text, list, url).await
+}

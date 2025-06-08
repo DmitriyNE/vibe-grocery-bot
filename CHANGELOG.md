@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 1. `/info` command shows commit hash and release version or how many commits the build is ahead of the latest release
+2. Remove items via voice commands like "delete milk". The bot replies with a copyable list of the deleted entries.
 
 ## [0.2.0] - 2025-06-08
 1. Add items by sending a photo using OpenAI vision to detect items automatically.
