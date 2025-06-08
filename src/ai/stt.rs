@@ -10,9 +10,9 @@ pub struct SttConfig {
 }
 
 /// Default instructions passed to GPT-based transcription models.
-/// The prompt also asks the model to keep spoken numbers intact so they aren't
-/// discarded during transcription.
-pub const DEFAULT_PROMPT: &str = "List the items mentioned, separated by commas or the word 'and'. Preserve numbers exactly as spoken.";
+/// The prompt also asks the model to keep spoken numbers intact and preserve
+/// verbs so commands like "delete" are not dropped during transcription.
+pub const DEFAULT_PROMPT: &str = "Transcribe the user's request about the list. Keep numbers and verbs like 'add' or 'delete' exactly as spoken.";
 
 #[derive(Deserialize)]
 struct TranscriptionResponse {
