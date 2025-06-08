@@ -3,4 +3,3 @@ target
 fly.toml
 .dockerignore
 .gitignore
-.git
