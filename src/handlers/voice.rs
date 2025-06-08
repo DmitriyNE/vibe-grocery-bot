@@ -8,6 +8,28 @@ use crate::ai::stt::{parse_voice_items, transcribe_audio, SttConfig, DEFAULT_PRO
 use crate::db::{add_item, delete_item, list_items};
 use crate::text_utils::{capitalize_first, normalize_for_match};
 
+use crate::db::Item;
+
+pub async fn delete_matching_items(
+    db: &Pool<Sqlite>,
+    current: &mut Vec<Item>,
+    items: &[String],
+) -> Result<Vec<String>> {
+    let mut deleted = Vec::new();
+    for item in items {
+        let needle = normalize_for_match(item);
+        if let Some(pos) = current
+            .iter()
+            .position(|i| normalize_for_match(&i.text) == needle)
+        {
+            let found = current.remove(pos);
+            delete_item(db, found.id).await?;
+            deleted.push(found.text);
+        }
+    }
+    Ok(deleted)
+}
+
 use super::list::send_list;
 
 pub async fn add_items_from_voice(
@@ -38,7 +60,7 @@ pub async fn add_items_from_voice(
                 tracing::debug!("voice transcription empty; ignoring");
                 return Ok(());
             }
-            let current = list_items(&db, msg.chat.id).await?;
+            let mut current = list_items(&db, msg.chat.id).await?;
             let list_texts: Vec<String> = current.iter().map(|i| i.text.clone()).collect();
             match interpret_voice_command(&config.api_key, &text, &list_texts).await {
                 Ok(VoiceCommand::Add(items)) => {
@@ -58,17 +80,7 @@ pub async fn add_items_from_voice(
                     }
                 }
                 Ok(VoiceCommand::Delete(items)) => {
-                    let mut deleted = Vec::new();
-                    for item in items {
-                        let needle = normalize_for_match(&item);
-                        if let Some(found) = current
-                            .iter()
-                            .find(|i| normalize_for_match(&i.text) == needle)
-                        {
-                            delete_item(&db, found.id).await?;
-                            deleted.push(found.text.clone());
-                        }
-                    }
+                    let deleted = delete_matching_items(&db, &mut current, &items).await?;
                     if !deleted.is_empty() {
                         tracing::info!(
                             "Deleted {} item(s) via voice for chat {}",
@@ -108,4 +120,63 @@ pub async fn add_items_from_voice(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sqlx::{sqlite::SqlitePoolOptions, Pool, Sqlite};
+    use teloxide::types::ChatId;
+
+    async fn init_db() -> Pool<Sqlite> {
+        let db = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+
+        sqlx::query(
+            "CREATE TABLE items(\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    chat_id INTEGER NOT NULL,\n    text TEXT NOT NULL,\n    done BOOLEAN NOT NULL DEFAULT 0\n)",
+        )
+        .execute(&db)
+        .await
+        .unwrap();
+
+        sqlx::query(
+            "CREATE TABLE chat_state(\n    chat_id INTEGER PRIMARY KEY,\n    last_list_message_id INTEGER\n)",
+        )
+        .execute(&db)
+        .await
+        .unwrap();
+
+        sqlx::query(
+            "CREATE TABLE delete_session(\n    user_id INTEGER PRIMARY KEY,\n    chat_id INTEGER NOT NULL,\n    selected TEXT NOT NULL DEFAULT '',\n    notice_chat_id INTEGER,\n    notice_message_id INTEGER,\n    dm_message_id INTEGER\n)",
+        )
+        .execute(&db)
+        .await
+        .unwrap();
+
+        db
+    }
+
+    #[tokio::test]
+    async fn delete_matching_multiple() {
+        let db = init_db().await;
+        let chat = ChatId(1);
+        for _ in 0..3 {
+            add_item(&db, chat, "Item").await.unwrap();
+        }
+
+        let mut current = list_items(&db, chat).await.unwrap();
+        let deleted = delete_matching_items(
+            &db,
+            &mut current,
+            &["Item".to_string(), "Item".to_string(), "Item".to_string()],
+        )
+        .await
+        .unwrap();
+        assert_eq!(deleted.len(), 3);
+        let remaining = list_items(&db, chat).await.unwrap();
+        assert!(remaining.is_empty());
+    }
 }
