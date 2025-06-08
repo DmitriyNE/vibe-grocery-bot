@@ -26,7 +26,7 @@ pub async fn parse_items_gpt_inner(api_key: &str, text: &str, url: &str) -> Resu
         "messages": [
             {
                 "role": "system",
-                "content": "Extract the items from the user's text. Preserve numbers exactly as provided, such as '1 milk'. Respond with a JSON object like {\"items\": [\"1 milk\"]}.",
+                "content": "Extract the items from the user's text. Use the nominative form for nouns when it does not change the meaning. Prefer digits for quantities like '42 eggs'. Respond with a JSON object like {\"items\": [\"1 milk\"]}",
             },
             { "role": "user", "content": text },
         ]
@@ -87,7 +87,7 @@ pub async fn interpret_voice_command_inner(
     };
 
     let prompt = format!(
-        "You manage a list of items. {list_text} Decide whether the user's request adds items or removes items from the list. Return a JSON object like {{\"add\":[...]}} or {{\"delete\":[...]}}. For deletions, only include items exactly as they appear in the list. If unsure, treat it as an addition request."
+        "You manage a list of items. {list_text} Decide whether the user's request adds items or removes items from the list. Return a JSON object like {{\"add\":[...]}} or {{\"delete\":[...]}}. For deletions, only include items exactly as they appear in the list. If unsure, treat it as an addition request. Use nominative forms for item names when possible and prefer digits for quantities."
     );
 
     let body = serde_json::json!({
