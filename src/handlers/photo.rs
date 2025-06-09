@@ -4,10 +4,9 @@ use sqlx::{Pool, Sqlite};
 use teloxide::prelude::*;
 
 use crate::ai::vision::parse_photo_items;
-use crate::db::add_item;
 use crate::text_utils::capitalize_first;
 
-use super::list::send_list;
+use super::list::insert_items;
 use crate::ai::config::AiConfig;
 
 pub async fn add_items_from_photo(
@@ -46,20 +45,14 @@ pub async fn add_items_from_photo(
         }
     };
 
-    let mut added = 0;
-    for item in items {
-        let cap = capitalize_first(&item);
-        add_item(&db, msg.chat.id, &cap).await?;
-        added += 1;
-    }
-
+    let items: Vec<String> = items.into_iter().map(|i| capitalize_first(&i)).collect();
+    let added = insert_items(bot, msg.chat.id, &db, items).await?;
     if added > 0 {
         tracing::info!(
             "Added {} item(s) from photo for chat {}",
             added,
             msg.chat.id
         );
-        send_list(bot, msg.chat.id, &db).await?;
     }
 
     Ok(())
