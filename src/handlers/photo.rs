@@ -14,9 +14,9 @@ pub async fn add_items_from_photo(
     bot: Bot,
     msg: Message,
     db: Pool<Sqlite>,
-    stt: Option<AiConfig>,
+    ai_config: Option<AiConfig>,
 ) -> Result<()> {
-    let Some(config) = stt else {
+    let Some(config) = ai_config else {
         return Ok(());
     };
 
@@ -80,14 +80,14 @@ mod tests {
         let bot = Bot::new("test");
         let json = r#"{"message_id":1,"date":0,"chat":{"id":1,"type":"private"},"photo":[]}"#;
         let msg: Message = serde_json::from_str(json).unwrap();
-        let stt = Some(AiConfig {
+        let ai_config = Some(AiConfig {
             api_key: "k".into(),
             stt_model: "m".into(),
             gpt_model: "g".into(),
             vision_model: "v".into(),
         });
 
-        let res = add_items_from_photo(bot, msg, db, stt).await;
+        let res = add_items_from_photo(bot, msg, db, ai_config).await;
         assert!(res.is_ok());
     }
 }
