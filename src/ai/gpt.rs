@@ -17,17 +17,6 @@ pub async fn parse_items_gpt(
     parse_items_gpt_inner(api_key, model, text, url).await
 }
 
-/// Legacy wrapper for [`parse_items_gpt`] used by voice message handling.
-#[instrument(level = "trace", skip(api_key))]
-pub async fn parse_voice_items_gpt(
-    api_key: &str,
-    model: &str,
-    text: &str,
-    url: Option<&str>,
-) -> Result<Vec<String>> {
-    parse_items_gpt(api_key, model, text, url).await
-}
-
 #[cfg_attr(not(test), allow(dead_code))]
 #[instrument(level = "trace", skip(api_key))]
 pub async fn parse_items_gpt_inner(

@@ -5,7 +5,7 @@ use teloxide::prelude::*;
 
 use crate::ai::config::AiConfig;
 use crate::ai::gpt::{interpret_voice_command, VoiceCommand};
-use crate::ai::stt::{parse_voice_items, transcribe_audio, DEFAULT_PROMPT};
+use crate::ai::stt::{parse_items, transcribe_audio, DEFAULT_PROMPT};
 #[cfg(test)]
 use crate::db::add_item;
 use crate::db::{delete_item, list_items};
@@ -101,7 +101,7 @@ pub async fn add_items_from_voice(
                 }
                 Err(err) => {
                     tracing::warn!("gpt command failed: {}", err);
-                    let items = parse_voice_items(&text);
+                    let items = parse_items(&text);
                     let items: Vec<String> =
                         items.into_iter().map(|i| capitalize_first(&i)).collect();
                     let added = insert_items(bot.clone(), msg.chat.id, &db, items).await?;
