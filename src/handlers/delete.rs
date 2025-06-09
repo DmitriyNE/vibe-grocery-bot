@@ -51,10 +51,7 @@ pub async fn enter_delete_mode(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Res
         let sent_msg = bot
             .send_message(msg.chat.id, "There is no active list to edit.")
             .await?;
-        tokio::spawn(async move {
-            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-            let _ = bot.delete_message(sent_msg.chat.id, sent_msg.id).await;
-        });
+        crate::delete_after(bot.clone(), sent_msg.chat.id, sent_msg.id, 5);
         return Ok(());
     }
 
@@ -113,10 +110,7 @@ pub async fn enter_delete_mode(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Res
                     "Unable to send you a private delete panel. Have you started me in private?",
                 )
                 .await?;
-            tokio::spawn(async move {
-                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-                let _ = bot.delete_message(warn.chat.id, warn.id).await;
-            });
+            crate::delete_after(bot.clone(), warn.chat.id, warn.id, 5);
         }
     }
 

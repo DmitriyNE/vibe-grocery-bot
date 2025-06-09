@@ -181,12 +181,7 @@ pub async fn nuke_list(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Result<()> 
     let confirmation = bot
         .send_message(msg.chat.id, "The active list has been nuked.")
         .await?;
-    tokio::spawn(async move {
-        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-        let _ = bot
-            .delete_message(confirmation.chat.id, confirmation.id)
-            .await;
-    });
+    crate::delete_after(bot.clone(), confirmation.chat.id, confirmation.id, 5);
 
     Ok(())
 }
