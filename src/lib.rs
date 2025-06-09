@@ -10,6 +10,9 @@ mod handlers;
 mod system_info;
 mod text_utils;
 
+#[cfg(test)]
+pub mod tests;
+
 pub use ai::gpt::{parse_items_gpt, parse_voice_items_gpt};
 pub use ai::stt::{parse_items, parse_voice_items};
 pub use db::Item;
@@ -159,61 +162,15 @@ pub async fn run() -> Result<()> {
 // ──────────────────────────────────────────────────────────────
 
 #[cfg(test)]
-mod tests {
+mod lib_tests {
     use super::*;
     use crate::db::*;
-    use sqlx::{sqlite::SqlitePoolOptions, Pool, Sqlite};
+    use crate::tests::util::init_test_db;
     use teloxide::types::MessageId;
-
-    async fn init_db() -> Pool<Sqlite> {
-        let db = SqlitePoolOptions::new()
-            .max_connections(1)
-            .connect("sqlite::memory:")
-            .await
-            .unwrap();
-
-        sqlx::query(
-            "CREATE TABLE items(
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                chat_id INTEGER NOT NULL,
-                text TEXT NOT NULL,
-                done BOOLEAN NOT NULL DEFAULT 0
-            )",
-        )
-        .execute(&db)
-        .await
-        .unwrap();
-
-        sqlx::query(
-            "CREATE TABLE chat_state(
-                chat_id INTEGER PRIMARY KEY,
-                last_list_message_id INTEGER
-            )",
-        )
-        .execute(&db)
-        .await
-        .unwrap();
-
-        sqlx::query(
-            "CREATE TABLE delete_session(
-                user_id INTEGER PRIMARY KEY,
-                chat_id INTEGER NOT NULL,
-                selected TEXT NOT NULL DEFAULT '',
-                notice_chat_id INTEGER,
-                notice_message_id INTEGER,
-                dm_message_id INTEGER
-            )",
-        )
-        .execute(&db)
-        .await
-        .unwrap();
-
-        db
-    }
 
     #[tokio::test]
     async fn basic_item_flow() -> Result<()> {
-        let db = init_db().await;
+        let db = init_test_db().await;
         let chat = ChatId(42);
 
         add_item(&db, chat, "Apples").await?;
@@ -241,7 +198,7 @@ mod tests {
 
     #[tokio::test]
     async fn last_message_id_roundtrip() -> Result<()> {
-        let db = init_db().await;
+        let db = init_test_db().await;
         let chat = ChatId(1);
 
         assert!(get_last_list_message_id(&db, chat).await?.is_none());

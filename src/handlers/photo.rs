@@ -72,42 +72,11 @@ pub async fn add_items_from_photo(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sqlx::{sqlite::SqlitePoolOptions, Pool, Sqlite};
-
-    async fn init_db() -> Pool<Sqlite> {
-        let db = SqlitePoolOptions::new()
-            .max_connections(1)
-            .connect("sqlite::memory:")
-            .await
-            .unwrap();
-
-        sqlx::query(
-            "CREATE TABLE items(\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    chat_id INTEGER NOT NULL,\n    text TEXT NOT NULL,\n    done BOOLEAN NOT NULL DEFAULT 0\n)",
-        )
-        .execute(&db)
-        .await
-        .unwrap();
-
-        sqlx::query(
-            "CREATE TABLE chat_state(\n    chat_id INTEGER PRIMARY KEY,\n    last_list_message_id INTEGER\n)",
-        )
-        .execute(&db)
-        .await
-        .unwrap();
-
-        sqlx::query(
-            "CREATE TABLE delete_session(\n    user_id INTEGER PRIMARY KEY,\n    chat_id INTEGER NOT NULL,\n    selected TEXT NOT NULL DEFAULT '',\n    notice_chat_id INTEGER,\n    notice_message_id INTEGER,\n    dm_message_id INTEGER\n)",
-        )
-        .execute(&db)
-        .await
-        .unwrap();
-
-        db
-    }
+    use crate::tests::util::init_test_db;
 
     #[tokio::test]
     async fn photo_with_no_sizes_returns_ok() {
-        let db = init_db().await;
+        let db = init_test_db().await;
         let bot = Bot::new("test");
         let json = r#"{"message_id":1,"date":0,"chat":{"id":1,"type":"private"},"photo":[]}"#;
         let msg: Message = serde_json::from_str(json).unwrap();
