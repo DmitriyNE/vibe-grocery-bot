@@ -8,13 +8,13 @@ use crate::db::add_item;
 use crate::text_utils::capitalize_first;
 
 use super::list::send_list;
-use crate::ai::stt::SttConfig;
+use crate::ai::config::AiConfig;
 
 pub async fn add_items_from_photo(
     bot: Bot,
     msg: Message,
     db: Pool<Sqlite>,
-    stt: Option<SttConfig>,
+    stt: Option<AiConfig>,
 ) -> Result<()> {
     let Some(config) = stt else {
         return Ok(());
@@ -39,8 +39,10 @@ pub async fn add_items_from_photo(
     while let Some(chunk) = stream.next().await {
         bytes.extend_from_slice(&chunk?);
     }
+    tracing::trace!(size = bytes.len(), "downloaded photo bytes");
 
-    let items = match parse_photo_items(&config.api_key, &bytes).await {
+    tracing::debug!(model = %config.vision_model, "parsing photo with OpenAI vision");
+    let items = match parse_photo_items(&config.api_key, &config.vision_model, &bytes).await {
         Ok(list) => list,
         Err(err) => {
             tracing::warn!("photo parsing failed: {}", err);
@@ -109,10 +111,11 @@ mod tests {
         let bot = Bot::new("test");
         let json = r#"{"message_id":1,"date":0,"chat":{"id":1,"type":"private"},"photo":[]}"#;
         let msg: Message = serde_json::from_str(json).unwrap();
-        let stt = Some(SttConfig {
+        let stt = Some(AiConfig {
             api_key: "k".into(),
-            model: "m".into(),
+            stt_model: "m".into(),
             gpt_model: "g".into(),
+            vision_model: "v".into(),
         });
 
         let res = add_items_from_photo(bot, msg, db, stt).await;

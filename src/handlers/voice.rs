@@ -3,8 +3,9 @@ use futures_util::StreamExt;
 use sqlx::{Pool, Sqlite};
 use teloxide::{net::Download, prelude::*};
 
+use crate::ai::config::AiConfig;
 use crate::ai::gpt::{interpret_voice_command, VoiceCommand};
-use crate::ai::stt::{parse_voice_items, transcribe_audio, SttConfig, DEFAULT_PROMPT};
+use crate::ai::stt::{parse_voice_items, transcribe_audio, DEFAULT_PROMPT};
 use crate::db::{add_item, delete_item, list_items};
 use crate::text_utils::{capitalize_first, normalize_for_match};
 
@@ -36,7 +37,7 @@ pub async fn add_items_from_voice(
     bot: Bot,
     msg: Message,
     db: Pool<Sqlite>,
-    stt: Option<SttConfig>,
+    stt: Option<AiConfig>,
 ) -> Result<()> {
     let Some(config) = stt else {
         return Ok(());
@@ -54,7 +55,14 @@ pub async fn add_items_from_voice(
         audio.extend_from_slice(&chunk?);
     }
 
-    match transcribe_audio(&config.model, &config.api_key, Some(DEFAULT_PROMPT), &audio).await {
+    match transcribe_audio(
+        &config.stt_model,
+        &config.api_key,
+        Some(DEFAULT_PROMPT),
+        &audio,
+    )
+    .await
+    {
         Ok(text) => {
             if text.trim().is_empty() {
                 tracing::debug!("voice transcription empty; ignoring");

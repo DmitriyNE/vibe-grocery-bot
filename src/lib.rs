@@ -41,12 +41,23 @@ pub async fn run() -> Result<()> {
     let bot = Bot::from_env();
 
     // Optional OpenAI speech-to-text configuration
-    let stt_config = match env::var("OPENAI_API_KEY") {
-        Ok(key) => Some(crate::ai::stt::SttConfig {
-            api_key: key,
-            model: env::var("OPENAI_STT_MODEL").unwrap_or_else(|_| "whisper-1".to_string()),
-            gpt_model: env::var("OPENAI_GPT_MODEL").unwrap_or_else(|_| "gpt-4.1".to_string()),
-        }),
+    let ai_config = match env::var("OPENAI_API_KEY") {
+        Ok(key) => {
+            let cfg = crate::ai::config::AiConfig {
+                api_key: key,
+                stt_model: env::var("OPENAI_STT_MODEL").unwrap_or_else(|_| "whisper-1".to_string()),
+                gpt_model: env::var("OPENAI_GPT_MODEL").unwrap_or_else(|_| "gpt-4.1".to_string()),
+                vision_model: env::var("OPENAI_VISION_MODEL")
+                    .unwrap_or_else(|_| "gpt-4o".to_string()),
+            };
+            tracing::debug!(
+                stt_model = cfg.stt_model,
+                gpt_model = cfg.gpt_model,
+                vision_model = cfg.vision_model,
+                "OpenAI configuration loaded"
+            );
+            Some(cfg)
+        }
         Err(_) => None,
     };
 
@@ -113,7 +124,7 @@ pub async fn run() -> Result<()> {
                      msg: Message,
                      cmd: Command,
                      db: Pool<Sqlite>,
-                     stt_config: Option<crate::ai::stt::SttConfig>| async move {
+                     ai_config: Option<crate::ai::config::AiConfig>| async move {
                         match cmd {
                             Command::Start | Command::Help => help(bot, msg).await?,
                             Command::List => send_list(bot, msg.chat.id, &db).await?,
@@ -122,7 +133,7 @@ pub async fn run() -> Result<()> {
                             Command::Share => share_list(bot, msg.chat.id, &db).await?,
                             Command::Nuke => nuke_list(bot, msg, &db).await?,
                             Command::Parse => {
-                                add_items_from_parsed_text(bot, msg, db, stt_config).await?
+                                add_items_from_parsed_text(bot, msg, db, ai_config).await?
                             }
                             Command::Info => show_system_info(bot, msg).await?,
                         }
@@ -134,7 +145,7 @@ pub async fn run() -> Result<()> {
 
     // --- Dispatcher ---
     Dispatcher::builder(bot, handler)
-        .dependencies(dptree::deps![db, stt_config])
+        .dependencies(dptree::deps![db, ai_config])
         .enable_ctrlc_handler()
         .build()
         .dispatch()

@@ -4,21 +4,22 @@ use base64::Engine as _;
 use tracing::instrument;
 
 #[instrument(level = "trace", skip(api_key, bytes))]
-pub async fn parse_photo_items(api_key: &str, bytes: &[u8]) -> Result<Vec<String>> {
-    parse_photo_items_inner(api_key, bytes, OPENAI_CHAT_URL).await
+pub async fn parse_photo_items(api_key: &str, model: &str, bytes: &[u8]) -> Result<Vec<String>> {
+    parse_photo_items_inner(api_key, model, bytes, OPENAI_CHAT_URL).await
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
 #[instrument(level = "trace", skip(api_key, bytes))]
 pub async fn parse_photo_items_inner(
     api_key: &str,
+    model: &str,
     bytes: &[u8],
     url: &str,
 ) -> Result<Vec<String>> {
     let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
     let data_url = format!("data:image/png;base64,{}", encoded);
     let body = serde_json::json!({
-        "model": "gpt-4o",
+        "model": model,
         "response_format": { "type": "json_object" },
         "messages": [
             {
@@ -37,6 +38,11 @@ pub async fn parse_photo_items_inner(
 
 #[cfg_attr(not(test), allow(dead_code))]
 #[instrument(level = "trace", skip(api_key, bytes))]
-pub async fn parse_photo_items_test(api_key: &str, bytes: &[u8], url: &str) -> Result<Vec<String>> {
-    parse_photo_items_inner(api_key, bytes, url).await
+pub async fn parse_photo_items_test(
+    api_key: &str,
+    model: &str,
+    bytes: &[u8],
+    url: &str,
+) -> Result<Vec<String>> {
+    parse_photo_items_inner(api_key, model, bytes, url).await
 }
