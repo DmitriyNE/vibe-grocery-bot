@@ -1,10 +1,9 @@
 use anyhow::Result;
-use dotenvy::dotenv;
 use sqlx::{Pool, Sqlite};
-use std::env; // Import the standard library's env module
 use teloxide::{prelude::*, utils::command::BotCommands};
 
 pub mod ai;
+mod config;
 mod db;
 mod handlers;
 mod system_info;
@@ -15,6 +14,7 @@ pub mod tests;
 
 pub use ai::gpt::{parse_items_gpt, parse_voice_items_gpt};
 pub use ai::stt::{parse_items, parse_voice_items};
+pub use config::Config;
 pub use db::Item;
 pub use handlers::{format_delete_list, format_list, format_plain_list};
 pub use system_info::get_system_info;
@@ -26,15 +26,9 @@ use handlers::{
     show_system_info,
 };
 
-// ──────────────────────────────────────────────────────────────
-// Main application setup
-// ──────────────────────────────────────────────────────────────
-
 pub async fn run() -> Result<()> {
-    // Load .env file if it exists (for local development)
-    dotenv().ok();
+    let config = Config::from_env();
 
-    // Initialize tracing subscriber for logging
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
@@ -43,31 +37,18 @@ pub async fn run() -> Result<()> {
 
     let bot = Bot::from_env();
 
-    // Optional OpenAI speech-to-text configuration
-    let ai_config = match env::var("OPENAI_API_KEY") {
-        Ok(key) => {
-            let cfg = crate::ai::config::AiConfig {
-                api_key: key,
-                stt_model: env::var("OPENAI_STT_MODEL").unwrap_or_else(|_| "whisper-1".to_string()),
-                gpt_model: env::var("OPENAI_GPT_MODEL").unwrap_or_else(|_| "gpt-4.1".to_string()),
-                vision_model: env::var("OPENAI_VISION_MODEL")
-                    .unwrap_or_else(|_| "gpt-4o".to_string()),
-            };
-            tracing::debug!(
-                stt_model = cfg.stt_model,
-                gpt_model = cfg.gpt_model,
-                vision_model = cfg.vision_model,
-                "OpenAI configuration loaded"
-            );
-            Some(cfg)
-        }
-        Err(_) => None,
-    };
+    if let Some(cfg) = &config.ai {
+        tracing::debug!(
+            stt_model = cfg.stt_model,
+            gpt_model = cfg.gpt_model,
+            vision_model = cfg.vision_model,
+            "OpenAI configuration loaded"
+        );
+    }
+    let ai_config = config.ai.clone();
 
     // --- SQLite Pool ---
-    // Read the database URL from the environment, with a fallback for local dev.
-    let db_url = env::var("DB_URL").unwrap_or_else(|_| "sqlite:shopping.db".to_string());
-    let db_url = db::prepare_sqlite_url(&db_url);
+    let db_url = db::prepare_sqlite_url(&config.db_url);
 
     tracing::info!("Connecting to database at: {}", &db_url);
 
@@ -75,9 +56,6 @@ pub async fn run() -> Result<()> {
 
     tracing::info!("Database connection successful.");
 
-    // --- Run Migrations ---
-    // Use embedded SQLx migrations so the database schema stays up to date
-    // without requiring manual setup.
     sqlx::migrate!("./migrations").run(&db).await?;
 
     // --- Command Enum ---
@@ -156,10 +134,6 @@ pub async fn run() -> Result<()> {
 
     Ok(())
 }
-
-// ──────────────────────────────────────────────────────────────
-// Tests
-// ──────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod lib_tests {
