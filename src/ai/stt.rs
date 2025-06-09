@@ -61,19 +61,9 @@ pub async fn transcribe_audio(
     api_key: &str,
     prompt: Option<&str>,
     bytes: &[u8],
+    url: Option<&str>,
 ) -> Result<String> {
-    transcribe_audio_inner(model, api_key, prompt, bytes, OPENAI_URL).await
-}
-
-#[cfg_attr(not(test), allow(dead_code))]
-#[instrument(level = "trace", skip(api_key, bytes))]
-pub async fn transcribe_audio_test(
-    model: &str,
-    api_key: &str,
-    prompt: Option<&str>,
-    bytes: &[u8],
-    url: &str,
-) -> Result<String> {
+    let url = url.unwrap_or(OPENAI_URL);
     transcribe_audio_inner(model, api_key, prompt, bytes, url).await
 }
 

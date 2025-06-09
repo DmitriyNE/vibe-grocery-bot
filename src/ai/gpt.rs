@@ -7,14 +7,25 @@ use tracing::instrument;
 /// The model is instructed to return a JSON object with an `items` array. The
 /// returned list is cleaned with [`crate::text_utils::parse_item_line`].
 #[instrument(level = "trace", skip(api_key))]
-pub async fn parse_items_gpt(api_key: &str, model: &str, text: &str) -> Result<Vec<String>> {
-    parse_items_gpt_inner(api_key, model, text, OPENAI_CHAT_URL).await
+pub async fn parse_items_gpt(
+    api_key: &str,
+    model: &str,
+    text: &str,
+    url: Option<&str>,
+) -> Result<Vec<String>> {
+    let url = url.unwrap_or(OPENAI_CHAT_URL);
+    parse_items_gpt_inner(api_key, model, text, url).await
 }
 
 /// Legacy wrapper for [`parse_items_gpt`] used by voice message handling.
 #[instrument(level = "trace", skip(api_key))]
-pub async fn parse_voice_items_gpt(api_key: &str, model: &str, text: &str) -> Result<Vec<String>> {
-    parse_items_gpt(api_key, model, text).await
+pub async fn parse_voice_items_gpt(
+    api_key: &str,
+    model: &str,
+    text: &str,
+    url: Option<&str>,
+) -> Result<Vec<String>> {
+    parse_items_gpt(api_key, model, text, url).await
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
@@ -38,28 +49,6 @@ pub async fn parse_items_gpt_inner(
     });
 
     request_items(api_key, &body, url).await
-}
-
-#[cfg_attr(not(test), allow(dead_code))]
-#[instrument(level = "trace", skip(api_key))]
-pub async fn parse_items_gpt_test(
-    api_key: &str,
-    model: &str,
-    text: &str,
-    url: &str,
-) -> Result<Vec<String>> {
-    parse_items_gpt_inner(api_key, model, text, url).await
-}
-
-/// Legacy wrapper for [`parse_items_gpt_test`].
-#[instrument(level = "trace", skip(api_key))]
-pub async fn parse_voice_items_gpt_test(
-    api_key: &str,
-    model: &str,
-    text: &str,
-    url: &str,
-) -> Result<Vec<String>> {
-    parse_items_gpt_test(api_key, model, text, url).await
 }
 
 #[derive(Debug, PartialEq)]

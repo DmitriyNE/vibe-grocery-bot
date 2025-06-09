@@ -4,8 +4,14 @@ use base64::Engine as _;
 use tracing::instrument;
 
 #[instrument(level = "trace", skip(api_key, bytes))]
-pub async fn parse_photo_items(api_key: &str, model: &str, bytes: &[u8]) -> Result<Vec<String>> {
-    parse_photo_items_inner(api_key, model, bytes, OPENAI_CHAT_URL).await
+pub async fn parse_photo_items(
+    api_key: &str,
+    model: &str,
+    bytes: &[u8],
+    url: Option<&str>,
+) -> Result<Vec<String>> {
+    let url = url.unwrap_or(OPENAI_CHAT_URL);
+    parse_photo_items_inner(api_key, model, bytes, url).await
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
@@ -34,15 +40,4 @@ pub async fn parse_photo_items_inner(
     });
 
     request_items(api_key, &body, url).await
-}
-
-#[cfg_attr(not(test), allow(dead_code))]
-#[instrument(level = "trace", skip(api_key, bytes))]
-pub async fn parse_photo_items_test(
-    api_key: &str,
-    model: &str,
-    bytes: &[u8],
-    url: &str,
-) -> Result<Vec<String>> {
-    parse_photo_items_inner(api_key, model, bytes, url).await
 }

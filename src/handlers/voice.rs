@@ -60,6 +60,7 @@ pub async fn add_items_from_voice(
         &config.api_key,
         Some(DEFAULT_PROMPT),
         &audio,
+        None,
     )
     .await
     {

@@ -1,4 +1,4 @@
-use shopbot::ai::stt::transcribe_audio_test;
+use shopbot::ai::stt::transcribe_audio;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -14,7 +14,7 @@ async fn test_transcribe_audio_parsing() {
         .await;
 
     let url = format!("{}/v1/audio/transcriptions", server.uri());
-    let res = transcribe_audio_test("whisper-1", "k", None, b"123", &url)
+    let res = transcribe_audio("whisper-1", "k", None, b"123", Some(&url))
         .await
         .unwrap();
     assert_eq!(res, "milk");
