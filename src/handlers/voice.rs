@@ -1,7 +1,7 @@
+use crate::utils::download_file;
 use anyhow::Result;
-use futures_util::StreamExt;
 use sqlx::{Pool, Sqlite};
-use teloxide::{net::Download, prelude::*};
+use teloxide::prelude::*;
 
 use crate::ai::config::AiConfig;
 use crate::ai::gpt::{interpret_voice_command, VoiceCommand};
@@ -49,11 +49,7 @@ pub async fn add_items_from_voice(
     };
 
     let file = bot.get_file(&voice.file.id).await?;
-    let mut audio = Vec::new();
-    let mut stream = bot.download_file_stream(&file.path);
-    while let Some(chunk) = stream.next().await {
-        audio.extend_from_slice(&chunk?);
-    }
+    let audio = download_file(&bot, &file.path).await?;
 
     match transcribe_audio(
         &config.stt_model,

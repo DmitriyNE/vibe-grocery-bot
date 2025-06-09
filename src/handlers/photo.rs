@@ -1,7 +1,7 @@
+use crate::utils::download_file;
 use anyhow::Result;
-use futures_util::StreamExt;
 use sqlx::{Pool, Sqlite};
-use teloxide::{net::Download, prelude::*};
+use teloxide::prelude::*;
 
 use crate::ai::vision::parse_photo_items;
 use crate::db::add_item;
@@ -34,11 +34,7 @@ pub async fn add_items_from_photo(
     };
 
     let file = bot.get_file(file_id).await?;
-    let mut bytes = Vec::new();
-    let mut stream = bot.download_file_stream(&file.path);
-    while let Some(chunk) = stream.next().await {
-        bytes.extend_from_slice(&chunk?);
-    }
+    let bytes = download_file(&bot, &file.path).await?;
     tracing::trace!(size = bytes.len(), "downloaded photo bytes");
 
     tracing::debug!(model = %config.vision_model, "parsing photo with OpenAI vision");
