@@ -42,12 +42,22 @@ pub async fn run() -> Result<()> {
 
     // Optional OpenAI speech-to-text configuration
     let ai_config = match env::var("OPENAI_API_KEY") {
-        Ok(key) => Some(crate::ai::config::AiConfig {
-            api_key: key,
-            stt_model: env::var("OPENAI_STT_MODEL").unwrap_or_else(|_| "whisper-1".to_string()),
-            gpt_model: env::var("OPENAI_GPT_MODEL").unwrap_or_else(|_| "gpt-4.1".to_string()),
-            vision_model: env::var("OPENAI_VISION_MODEL").unwrap_or_else(|_| "gpt-4o".to_string()),
-        }),
+        Ok(key) => {
+            let cfg = crate::ai::config::AiConfig {
+                api_key: key,
+                stt_model: env::var("OPENAI_STT_MODEL").unwrap_or_else(|_| "whisper-1".to_string()),
+                gpt_model: env::var("OPENAI_GPT_MODEL").unwrap_or_else(|_| "gpt-4.1".to_string()),
+                vision_model: env::var("OPENAI_VISION_MODEL")
+                    .unwrap_or_else(|_| "gpt-4o".to_string()),
+            };
+            tracing::debug!(
+                stt_model = cfg.stt_model,
+                gpt_model = cfg.gpt_model,
+                vision_model = cfg.vision_model,
+                "OpenAI configuration loaded"
+            );
+            Some(cfg)
+        }
         Err(_) => None,
     };
 
