@@ -55,9 +55,9 @@ pub async fn add_items_from_parsed_text(
     bot: Bot,
     msg: Message,
     db: Pool<Sqlite>,
-    stt: Option<AiConfig>,
+    ai_config: Option<AiConfig>,
 ) -> Result<()> {
-    let Some(config) = stt else {
+    let Some(config) = ai_config else {
         bot.send_message(msg.chat.id, "GPT parsing is disabled.")
             .await?;
         return Ok(());
