@@ -23,14 +23,9 @@ use handlers::{
     show_system_info,
 };
 
-// ──────────────────────────────────────────────────────────────
-// Main application setup
-// ──────────────────────────────────────────────────────────────
-
 pub async fn run() -> Result<()> {
     let config = Config::from_env();
 
-    // Initialize tracing subscriber for logging
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
@@ -58,9 +53,6 @@ pub async fn run() -> Result<()> {
 
     tracing::info!("Database connection successful.");
 
-    // --- Run Migrations ---
-    // Use embedded SQLx migrations so the database schema stays up to date
-    // without requiring manual setup.
     sqlx::migrate!("./migrations").run(&db).await?;
 
     // --- Command Enum ---
@@ -139,10 +131,6 @@ pub async fn run() -> Result<()> {
 
     Ok(())
 }
-
-// ──────────────────────────────────────────────────────────────
-// Tests
-// ──────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
