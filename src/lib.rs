@@ -10,7 +10,6 @@ mod system_info;
 mod text_utils;
 mod utils;
 
-#[cfg(test)]
 pub mod tests;
 
 pub use ai::gpt::parse_items_gpt;
