@@ -16,7 +16,9 @@ pub use delete_session::{
     clear_delete_session, get_delete_session, init_delete_session, set_delete_dm_message,
     set_delete_notice, update_delete_selection,
 };
-pub use items::{add_item, delete_all_items, delete_item, list_items, toggle_item, Item};
+pub use items::{
+    add_item, delete_all_items, delete_item, delete_items, list_items, toggle_item, Item,
+};
 
 pub fn prepare_sqlite_url(url: &str) -> String {
     if url.starts_with("sqlite:") && !url.contains("mode=") && !url.contains(":memory:") {

@@ -8,7 +8,7 @@ use crate::ai::gpt::{interpret_voice_command, VoiceCommand};
 use crate::ai::stt::{parse_items, transcribe_audio, DEFAULT_PROMPT};
 #[cfg(test)]
 use crate::db::add_item;
-use crate::db::{delete_item, list_items};
+use crate::db::{delete_items, list_items};
 use crate::text_utils::{capitalize_first, normalize_for_match};
 
 use crate::db::Item;
@@ -19,6 +19,7 @@ pub async fn delete_matching_items(
     items: &[String],
 ) -> Result<Vec<String>> {
     let mut deleted = Vec::new();
+    let mut ids = Vec::new();
     for item in items {
         let needle = normalize_for_match(item);
         if let Some(pos) = current
@@ -26,10 +27,11 @@ pub async fn delete_matching_items(
             .position(|i| normalize_for_match(&i.text) == needle)
         {
             let found = current.remove(pos);
-            delete_item(db, found.id).await?;
+            ids.push(found.id);
             deleted.push(found.text);
         }
     }
+    delete_items(db, &ids).await?;
     Ok(deleted)
 }
 
@@ -146,7 +148,34 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(deleted.len(), 3);
+        assert!(current.is_empty());
         let remaining = list_items(&db, chat).await.unwrap();
         assert!(remaining.is_empty());
+    }
+
+    #[tokio::test]
+    async fn delete_matching_partial() {
+        let db = init_test_db().await;
+        let chat = ChatId(1);
+        add_item(&db, chat, "Apple").await.unwrap();
+        add_item(&db, chat, "Banana").await.unwrap();
+        add_item(&db, chat, "Carrot").await.unwrap();
+
+        let mut current = list_items(&db, chat).await.unwrap();
+        let deleted = delete_matching_items(
+            &db,
+            &mut current,
+            &["Banana".to_string(), "Carrot".to_string()],
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(deleted, vec!["Banana".to_string(), "Carrot".to_string()]);
+        assert_eq!(current.len(), 1);
+        assert_eq!(current[0].text, "Apple");
+
+        let remaining = list_items(&db, chat).await.unwrap();
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0].text, "Apple");
     }
 }
