@@ -24,6 +24,23 @@ struct ItemsJson {
 
 pub const OPENAI_CHAT_URL: &str = "https://api.openai.com/v1/chat/completions";
 
+#[instrument(level = "trace", skip(api_key, builder))]
+pub async fn send_openai_request(
+    api_key: &str,
+    builder: reqwest::RequestBuilder,
+) -> Result<reqwest::Response> {
+    let resp = builder.bearer_auth(api_key).send().await?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let err_text = resp.text().await.unwrap_or_default();
+        warn!(%status, "OpenAI API error");
+        return Err(anyhow!("OpenAI API error {status}: {err_text}"));
+    }
+
+    Ok(resp)
+}
+
 #[instrument(level = "trace", skip(api_key, body))]
 pub async fn request_items(
     api_key: &str,
@@ -33,19 +50,8 @@ pub async fn request_items(
     debug!(url, "sending chat completion request");
 
     let client = reqwest::Client::new();
-    let resp = client
-        .post(url)
-        .bearer_auth(api_key)
-        .json(body)
-        .send()
-        .await?;
-
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let err_text = resp.text().await.unwrap_or_default();
-        warn!(%status, "OpenAI API error");
-        return Err(anyhow!("OpenAI API error {status}: {err_text}"));
-    }
+    let builder = client.post(url).json(body);
+    let resp = send_openai_request(api_key, builder).await?;
 
     let raw = resp.text().await?;
     trace!(raw = %raw, "chat response");
