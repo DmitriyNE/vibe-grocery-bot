@@ -33,6 +33,7 @@ pub async fn add_items_from_photo(
         return Ok(());
     };
 
+    tracing::debug!(model = %config.vision_model, "parsing photo with OpenAI vision");
 #[cfg(test)]
 mod tests {
     use super::*;
