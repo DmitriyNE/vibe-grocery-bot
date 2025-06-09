@@ -5,10 +5,9 @@ use teloxide::prelude::*;
 use crate::ai::config::AiConfig;
 use crate::ai::gpt::parse_items_gpt;
 use crate::ai::stt::parse_items;
-use crate::db::add_item;
 use crate::text_utils::{capitalize_first, parse_item_line};
 
-use super::list::send_list;
+use super::list::insert_items;
 
 pub async fn help(bot: Bot, msg: Message) -> Result<()> {
     bot.send_message(
@@ -31,21 +30,11 @@ pub async fn help(bot: Bot, msg: Message) -> Result<()> {
 
 pub async fn add_items_from_text(bot: Bot, msg: Message, db: Pool<Sqlite>) -> Result<()> {
     if let Some(text) = msg.text() {
-        let mut items_added_count = 0;
-        for line in text.lines() {
-            if let Some(cleaned_line) = parse_item_line(line) {
-                add_item(&db, msg.chat.id, &cleaned_line).await?;
-                items_added_count += 1;
-            }
-        }
+        let items: Vec<String> = text.lines().filter_map(parse_item_line).collect();
 
-        if items_added_count > 0 {
-            tracing::info!(
-                "Added {} item(s) for chat {}",
-                items_added_count,
-                msg.chat.id
-            );
-            send_list(bot, msg.chat.id, &db).await?;
+        let added = insert_items(bot, msg.chat.id, &db, items).await?;
+        if added > 0 {
+            tracing::info!("Added {} item(s) for chat {}", added, msg.chat.id);
         }
     }
     Ok(())
@@ -75,20 +64,14 @@ pub async fn add_items_from_parsed_text(
         }
     };
 
-    let mut added = 0;
-    for item in items {
-        let cap = capitalize_first(&item);
-        add_item(&db, msg.chat.id, &cap).await?;
-        added += 1;
-    }
-
+    let items: Vec<String> = items.into_iter().map(|i| capitalize_first(&i)).collect();
+    let added = insert_items(bot, msg.chat.id, &db, items).await?;
     if added > 0 {
         tracing::info!(
             "Added {} item(s) via /parse for chat {}",
             added,
             msg.chat.id
         );
-        send_list(bot, msg.chat.id, &db).await?;
     }
 
     Ok(())

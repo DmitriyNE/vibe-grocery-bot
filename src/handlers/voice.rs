@@ -6,7 +6,9 @@ use teloxide::{net::Download, prelude::*};
 use crate::ai::config::AiConfig;
 use crate::ai::gpt::{interpret_voice_command, VoiceCommand};
 use crate::ai::stt::{parse_voice_items, transcribe_audio, DEFAULT_PROMPT};
-use crate::db::{add_item, delete_item, list_items};
+#[cfg(test)]
+use crate::db::add_item;
+use crate::db::{delete_item, list_items};
 use crate::text_utils::{capitalize_first, normalize_for_match};
 
 use crate::db::Item;
@@ -31,7 +33,7 @@ pub async fn delete_matching_items(
     Ok(deleted)
 }
 
-use super::list::send_list;
+use super::list::{insert_items, send_list};
 
 pub async fn add_items_from_voice(
     bot: Bot,
@@ -75,19 +77,15 @@ pub async fn add_items_from_voice(
                 .await
             {
                 Ok(VoiceCommand::Add(items)) => {
-                    let mut added = 0;
-                    for item in items {
-                        let cap = capitalize_first(&item);
-                        add_item(&db, msg.chat.id, &cap).await?;
-                        added += 1;
-                    }
+                    let items: Vec<String> =
+                        items.into_iter().map(|i| capitalize_first(&i)).collect();
+                    let added = insert_items(bot.clone(), msg.chat.id, &db, items).await?;
                     if added > 0 {
                         tracing::info!(
                             "Added {} item(s) from voice for chat {}",
                             added,
                             msg.chat.id
                         );
-                        send_list(bot.clone(), msg.chat.id, &db).await?;
                     }
                 }
                 Ok(VoiceCommand::Delete(items)) => {
@@ -108,19 +106,15 @@ pub async fn add_items_from_voice(
                 Err(err) => {
                     tracing::warn!("gpt command failed: {}", err);
                     let items = parse_voice_items(&text);
-                    let mut added = 0;
-                    for item in items {
-                        let cap = capitalize_first(&item);
-                        add_item(&db, msg.chat.id, &cap).await?;
-                        added += 1;
-                    }
+                    let items: Vec<String> =
+                        items.into_iter().map(|i| capitalize_first(&i)).collect();
+                    let added = insert_items(bot.clone(), msg.chat.id, &db, items).await?;
                     if added > 0 {
                         tracing::info!(
                             "Added {} item(s) from voice for chat {}",
                             added,
                             msg.chat.id
                         );
-                        send_list(bot.clone(), msg.chat.id, &db).await?;
                     }
                 }
             }

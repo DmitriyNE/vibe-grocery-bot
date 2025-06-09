@@ -185,3 +185,27 @@ pub async fn nuke_list(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Result<()> 
 
     Ok(())
 }
+
+pub async fn insert_items<I>(
+    bot: Bot,
+    chat_id: ChatId,
+    db: &Pool<Sqlite>,
+    items: I,
+) -> Result<usize>
+where
+    I: IntoIterator<Item = String>,
+{
+    let mut added = 0usize;
+    for item in items {
+        add_item(db, chat_id, &item).await?;
+        added += 1;
+    }
+
+    if added > 0 {
+        tracing::debug!(chat_id = chat_id.0, added, "Inserted items");
+        send_list(bot, chat_id, db).await?;
+    } else {
+        tracing::debug!(chat_id = chat_id.0, "No items inserted");
+    }
+    Ok(added)
+}
