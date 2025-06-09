@@ -8,13 +8,13 @@ use crate::db::add_item;
 use crate::text_utils::capitalize_first;
 
 use super::list::send_list;
-use crate::ai::stt::SttConfig;
+use crate::ai::config::AiConfig;
 
 pub async fn add_items_from_photo(
     bot: Bot,
     msg: Message,
     db: Pool<Sqlite>,
-    stt: Option<SttConfig>,
+    stt: Option<AiConfig>,
 ) -> Result<()> {
     let Some(config) = stt else {
         return Ok(());
@@ -37,7 +37,7 @@ pub async fn add_items_from_photo(
         bytes.extend_from_slice(&chunk?);
     }
 
-    let items = match parse_photo_items(&config.api_key, &bytes).await {
+    let items = match parse_photo_items(&config.api_key, &config.vision_model, &bytes).await {
         Ok(list) => list,
         Err(err) => {
             tracing::warn!("photo parsing failed: {}", err);

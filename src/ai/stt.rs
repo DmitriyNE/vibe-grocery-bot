@@ -3,13 +3,6 @@ use reqwest::multipart::{Form, Part};
 use serde::Deserialize;
 use tracing::{debug, instrument, trace, warn};
 
-#[derive(Clone)]
-pub struct SttConfig {
-    pub api_key: String,
-    pub model: String,
-    pub gpt_model: String,
-}
-
 /// Default instructions passed to GPT-based transcription models.
 /// The prompt also asks the model to keep verbs intact so commands like
 /// "delete" are not dropped during transcription. Quantities should be

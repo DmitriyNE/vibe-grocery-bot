@@ -15,6 +15,8 @@ async fn test_parse_photo_items() {
         .await;
 
     let url = format!("{}/v1/chat/completions", server.uri());
-    let items = parse_photo_items_test("k", b"img", &url).await.unwrap();
+    let items = parse_photo_items_test("k", "gpt-4o", b"img", &url)
+        .await
+        .unwrap();
     assert_eq!(items, vec!["apples"]);
 }
