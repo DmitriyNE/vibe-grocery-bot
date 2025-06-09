@@ -67,7 +67,7 @@ pub async fn add_items_from_parsed_text(
         return Ok(());
     };
 
-    let items = match parse_items_gpt(&config.api_key, &config.gpt_model, text).await {
+    let items = match parse_items_gpt(&config.api_key, &config.gpt_model, text, None).await {
         Ok(list) => list,
         Err(err) => {
             tracing::warn!("gpt parsing failed: {}", err);

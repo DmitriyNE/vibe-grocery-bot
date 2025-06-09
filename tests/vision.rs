@@ -1,4 +1,4 @@
-use shopbot::ai::vision::parse_photo_items_test;
+use shopbot::ai::vision::parse_photo_items;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -15,7 +15,7 @@ async fn test_parse_photo_items() {
         .await;
 
     let url = format!("{}/v1/chat/completions", server.uri());
-    let items = parse_photo_items_test("k", "gpt-4o", b"img", &url)
+    let items = parse_photo_items("k", "gpt-4o", b"img", Some(&url))
         .await
         .unwrap();
     assert_eq!(items, vec!["apples"]);

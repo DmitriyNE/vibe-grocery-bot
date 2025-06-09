@@ -42,7 +42,7 @@ pub async fn add_items_from_photo(
     tracing::trace!(size = bytes.len(), "downloaded photo bytes");
 
     tracing::debug!(model = %config.vision_model, "parsing photo with OpenAI vision");
-    let items = match parse_photo_items(&config.api_key, &config.vision_model, &bytes).await {
+    let items = match parse_photo_items(&config.api_key, &config.vision_model, &bytes, None).await {
         Ok(list) => list,
         Err(err) => {
             tracing::warn!("photo parsing failed: {}", err);
