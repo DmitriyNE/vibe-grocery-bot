@@ -1,6 +1,9 @@
+use futures_util::StreamExt;
 use teloxide::{
+    net::Download,
     prelude::*,
     types::{ChatId, MessageId},
+    RequestError,
 };
 
 /// Delete a message after the given delay in seconds.
@@ -15,4 +18,15 @@ pub fn delete_after(bot: Bot, chat_id: ChatId, message_id: MessageId, secs: u64)
         tokio::time::sleep(std::time::Duration::from_secs(secs)).await;
         let _ = bot.delete_message(chat_id, message_id).await;
     });
+}
+
+/// Download a file from Telegram and return the raw bytes.
+pub async fn download_file(bot: &Bot, path: &str) -> Result<Vec<u8>, RequestError> {
+    let mut data = Vec::new();
+    let mut stream = bot.download_file_stream(path);
+    while let Some(chunk) = stream.next().await {
+        data.extend_from_slice(&chunk?);
+    }
+    tracing::trace!(size = data.len(), "downloaded file bytes");
+    Ok(data)
 }
