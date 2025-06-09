@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+1. Vision model configurable via `OPENAI_VISION_MODEL`.
 
 ## [0.3.0] - 2025-06-09
 1. `/info` command shows commit hash and release version or how many commits the build is ahead of the latest release

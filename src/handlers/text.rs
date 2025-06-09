@@ -2,8 +2,9 @@ use anyhow::Result;
 use sqlx::{Pool, Sqlite};
 use teloxide::prelude::*;
 
+use crate::ai::config::AiConfig;
 use crate::ai::gpt::parse_items_gpt;
-use crate::ai::stt::{parse_items, SttConfig};
+use crate::ai::stt::parse_items;
 use crate::db::add_item;
 use crate::text_utils::{capitalize_first, parse_item_line};
 
@@ -54,7 +55,7 @@ pub async fn add_items_from_parsed_text(
     bot: Bot,
     msg: Message,
     db: Pool<Sqlite>,
-    stt: Option<SttConfig>,
+    stt: Option<AiConfig>,
 ) -> Result<()> {
     let Some(config) = stt else {
         bot.send_message(msg.chat.id, "GPT parsing is disabled.")
