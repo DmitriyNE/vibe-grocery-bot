@@ -1,7 +1,7 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use reqwest::multipart::{Form, Part};
 use serde::Deserialize;
-use tracing::{debug, instrument, trace, warn};
+use tracing::{debug, instrument, trace};
 
 /// Default instructions passed to GPT-based transcription models.
 /// The prompt also asks the model to keep verbs intact so commands like
@@ -36,19 +36,8 @@ async fn transcribe_audio_inner(
     debug!(model, prompt=?prompt, url, "sending transcription request");
 
     let client = reqwest::Client::new();
-    let resp = client
-        .post(url)
-        .bearer_auth(api_key)
-        .multipart(form)
-        .send()
-        .await?;
-
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let err_text = resp.text().await.unwrap_or_default();
-        warn!(%status, "OpenAI API error");
-        return Err(anyhow!("OpenAI API error {status}: {err_text}"));
-    }
+    let builder = client.post(url).multipart(form);
+    let resp = crate::ai::common::send_openai_request(api_key, builder).await?;
 
     let data: TranscriptionResponse = resp.json().await?;
     trace!(transcription = %data.text, "transcription successful");
