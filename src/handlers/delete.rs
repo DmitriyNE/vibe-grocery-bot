@@ -42,7 +42,7 @@ pub fn format_delete_list(
 pub async fn enter_delete_mode(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Result<()> {
     tracing::debug!(
         chat_id = msg.chat.id.0,
-        user_id = msg.from().map(|u| u.id.0),
+        user_id = msg.from.as_ref().map(|u| u.id.0),
         "Entering delete mode",
     );
     let _ = bot.delete_message(msg.chat.id, msg.id).await;
@@ -58,7 +58,7 @@ pub async fn enter_delete_mode(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Res
         return Ok(());
     }
 
-    let user = match msg.from() {
+    let user = match msg.from.as_ref() {
         Some(u) => u,
         None => return Ok(()),
     };
@@ -130,7 +130,7 @@ pub async fn callback_handler(bot: Bot, q: CallbackQuery, db: Pool<Sqlite>) -> R
 
             if id_str == "done" {
                 if let Some(session) = get_delete_session(&db, user_id).await? {
-                    if session.dm_message_id.map(|m| m.0) != Some(msg.id.0) {
+                    if session.dm_message_id.map(|m| m.0) != Some(msg.id().0) {
                         return Ok(());
                     }
                     for id in &session.selected {
@@ -151,10 +151,10 @@ pub async fn callback_handler(bot: Bot, q: CallbackQuery, db: Pool<Sqlite>) -> R
                     clear_delete_session(&db, user_id).await?;
                 }
 
-                let _ = bot.delete_message(msg.chat.id, msg.id).await;
+                let _ = bot.delete_message(msg.chat().id, msg.id()).await;
             } else if let Ok(id) = id_str.parse::<i64>() {
                 if let Some(mut session) = get_delete_session(&db, user_id).await? {
-                    if session.dm_message_id.map(|m| m.0) != Some(msg.id.0) {
+                    if session.dm_message_id.map(|m| m.0) != Some(msg.id().0) {
                         return Ok(());
                     }
                     if session.selected.contains(&id) {
@@ -166,14 +166,14 @@ pub async fn callback_handler(bot: Bot, q: CallbackQuery, db: Pool<Sqlite>) -> R
                     let items = list_items(&db, session.chat_id).await?;
                     let (text, keyboard) = format_delete_list(&items, &session.selected);
                     let _ = bot
-                        .edit_message_text(msg.chat.id, msg.id, text)
+                        .edit_message_text(msg.chat().id, msg.id(), text)
                         .reply_markup(keyboard)
                         .await;
                 }
             }
         } else if let Ok(id) = data.parse::<i64>() {
             toggle_item(&db, id).await?;
-            update_list_message(&bot, msg.chat.id, msg.id, &db).await?;
+            update_list_message(&bot, msg.chat().id, msg.id(), &db).await?;
         }
     }
 
