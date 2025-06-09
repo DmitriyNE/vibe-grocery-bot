@@ -1,7 +1,7 @@
 use anyhow::Result;
 use dotenvy::dotenv;
 use sqlx::{Pool, Sqlite};
-use std::env; // Import the standard library's env module
+use std::env;
 use teloxide::{prelude::*, utils::command::BotCommands};
 
 pub mod ai;
@@ -23,15 +23,9 @@ use handlers::{
     show_system_info,
 };
 
-// ──────────────────────────────────────────────────────────────
-// Main application setup
-// ──────────────────────────────────────────────────────────────
-
 pub async fn run() -> Result<()> {
-    // Load .env file if it exists (for local development)
     dotenv().ok();
 
-    // Initialize tracing subscriber for logging
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
@@ -40,7 +34,6 @@ pub async fn run() -> Result<()> {
 
     let bot = Bot::from_env();
 
-    // Optional OpenAI speech-to-text configuration
     let ai_config = match env::var("OPENAI_API_KEY") {
         Ok(key) => {
             let cfg = crate::ai::config::AiConfig {
@@ -61,8 +54,6 @@ pub async fn run() -> Result<()> {
         Err(_) => None,
     };
 
-    // --- SQLite Pool ---
-    // Read the database URL from the environment, with a fallback for local dev.
     let db_url = env::var("DB_URL").unwrap_or_else(|_| "sqlite:shopping.db".to_string());
     let db_url = db::prepare_sqlite_url(&db_url);
 
@@ -72,9 +63,6 @@ pub async fn run() -> Result<()> {
 
     tracing::info!("Database connection successful.");
 
-    // --- Run Migrations ---
-    // Use embedded SQLx migrations so the database schema stays up to date
-    // without requiring manual setup.
     sqlx::migrate!("./migrations").run(&db).await?;
 
     // --- Command Enum ---
