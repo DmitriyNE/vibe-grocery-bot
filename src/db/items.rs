@@ -54,3 +54,19 @@ pub async fn delete_all_items(db: &Pool<Sqlite>, chat_id: ChatId) -> Result<()> 
         .await?;
     Ok(())
 }
+
+pub async fn delete_items(db: &Pool<Sqlite>, ids: &[i64]) -> Result<()> {
+    tracing::trace!(?ids, "Deleting multiple items");
+    if ids.is_empty() {
+        return Ok(());
+    }
+
+    let mut builder = sqlx::QueryBuilder::new("DELETE FROM items WHERE id IN (");
+    let mut separated = builder.separated(", ");
+    for id in ids {
+        separated.push_bind(id);
+    }
+    separated.push_unseparated(")");
+    builder.build().execute(db).await?;
+    Ok(())
+}
