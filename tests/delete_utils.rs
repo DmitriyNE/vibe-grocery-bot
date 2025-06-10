@@ -17,7 +17,7 @@ async fn test_delete_after_sends_request() {
         .await;
 
     let bot = Bot::new("TEST").set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
-    delete_after(bot, ChatId(1), MessageId(2), 0);
-    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    let handle = delete_after(bot, ChatId(1), MessageId(2), 0);
+    handle.await.unwrap();
     server.verify().await;
 }
