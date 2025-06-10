@@ -1,3 +1,4 @@
+use crate::messages::ARCHIVED_LIST_HEADER;
 use tracing::trace;
 
 /// Clean a single text line from a user message.
@@ -7,7 +8,7 @@ use tracing::trace;
 /// the cleaned line without leading status emojis or whitespace.
 pub fn parse_item_line(line: &str) -> Option<String> {
     trace!(?line, "Parsing item line");
-    if line.trim() == "--- Archived List ---" {
+    if line.trim() == ARCHIVED_LIST_HEADER {
         trace!("Ignoring archived list separator");
         return None;
     }
@@ -73,5 +74,15 @@ mod tests {
     #[test]
     fn capitalize_with_emoji() {
         assert_eq!(capitalize_first("🍎 apple"), "🍎 apple");
+    }
+
+    #[test]
+    fn parse_item_line_ignores_archived_header() {
+        assert!(parse_item_line(ARCHIVED_LIST_HEADER).is_none());
+    }
+
+    #[test]
+    fn parse_item_line_trims_and_returns_text() {
+        assert_eq!(parse_item_line("✅ Milk  "), Some("Milk".to_string()));
     }
 }
