@@ -100,6 +100,8 @@ pub async fn interpret_voice_command_inner(
     let resp = crate::ai::common::send_openai_request(api_key, builder).await?;
 
     let raw = resp.text().await?;
+    let snippet: String = raw.chars().take(200).collect();
+    debug!(snippet = %snippet, "chat response body");
     trace!(raw = %raw, "chat response");
     let chat: ChatResponse = serde_json::from_str(&raw)?;
     let content = chat
