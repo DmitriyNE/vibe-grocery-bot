@@ -8,6 +8,9 @@
   for important operations so behavior can be traced in production.
 - Always write tests for added functionality, preferring property-based tests
   (proptests) when feasible.
+- Unit tests belong in `src/` modules within `#[cfg(test)]` blocks.
+- The `tests/` directory is reserved for integration tests that rely on the
+  public crate API.
 - Avoid global state. Persist temporary data such as deletion selections and any notice messages in the database.
 - Keep the `migrations/` directory up to date whenever the database schema changes so that embedded migrations remain in sync.
 - Update `CHANGELOG.md` only for user-visible changes. Internal CI and tooling updates should not be listed. Keep pending changes under a `## Unreleased` section as a numbered list. When the project version is bumped, add a `## [version] - <date>` heading below `Unreleased` and continue the next list under `Unreleased`.
