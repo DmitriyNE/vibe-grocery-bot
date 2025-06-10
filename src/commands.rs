@@ -10,7 +10,7 @@ pub enum Command {
     Start,
     #[command(description = "display this text.")]
     Help,
-    #[command(description = "show the current shopping list.")]
+    #[command(description = "show the current item list.")]
     List,
     #[command(description = "finalize and archive the current list, starting a new one.")]
     Archive,

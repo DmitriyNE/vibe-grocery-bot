@@ -41,7 +41,7 @@ Non-secret settings can be customised via environment variables. `config.env.exa
 Set these variables as needed before running:
 
 - `TELOXIDE_TOKEN` – Telegram bot token from @BotFather (secret)
-- `DB_URL` – optional SQLite connection string (defaults to `sqlite:shopping.db`)
+- `DB_URL` – optional SQLite connection string (defaults to `sqlite:items.db`)
 - `DB_POOL_SIZE` – optional maximum number of SQLite connections (defaults to `5`)
 - `DELETE_AFTER_TIMEOUT` – optional delay in seconds before temporary messages are deleted (defaults to `5`)
 - `RUST_LOG` – optional logging level (e.g. `info` or `debug`)
@@ -52,7 +52,7 @@ Set these variables as needed before running:
 - `OPENAI_CHAT_URL` – optional URL for the chat completion API
 - `OPENAI_STT_URL` – optional URL for the transcription API
 
-The database file is created automatically if needed. Embedded SQLx migrations in the `migrations/` directory are executed on startup. When deploying on Fly.io, set `DB_URL` to `sqlite:///data/shopping.db` to match `fly.toml`.
+The database file is created automatically if needed. Embedded SQLx migrations in the `migrations/` directory are executed on startup.
 
 ## Running
 

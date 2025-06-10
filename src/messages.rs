@@ -4,10 +4,10 @@
 //! easy to update or translate.
 
 pub const HELP_TEXT: &str =
-    "Send me any text to add it to your shopping list. Each line will be a new item.\n\
+    "Send me any text to add it to your item list. Each line will be a new item.\n\
              You can tap the checkbox button next to an item to mark it as bought.\n\n\
              <b>Commands:</b>\n\
-             /list - Show the current shopping list.\n\
+             /list - Show the current item list.\n\
              /archive - Finalize and archive the current list, starting a new one.\n\
              /delete - Show a temporary panel to delete items from the list.\n\
              /share - Send the list as plain text for copying.\n\
@@ -21,8 +21,8 @@ pub const NO_ACTIVE_LIST_TO_EDIT: &str = "There is no active list to edit.";
 pub const NO_ACTIVE_LIST_TO_ARCHIVE: &str = "There is no active list to archive.";
 
 pub const LIST_EMPTY_ADD_ITEM: &str =
-    "Your shopping list is empty! Send any message to add an item.";
-pub const LIST_EMPTY: &str = "Your shopping list is empty!";
+    "Your item list is empty! Send any message to add an item.";
+pub const LIST_EMPTY: &str = "Your item list is empty!";
 pub const LIST_NOW_EMPTY: &str = "List is now empty!";
 pub const LIST_ARCHIVED: &str = "List archived! Send a message to start a new one.";
 pub const LIST_NUKED: &str = "The active list has been nuked.";

@@ -9,6 +9,8 @@ All notable changes to this project will be documented in this file.
 4. Database pool size configurable via `DB_POOL_SIZE`.
 5. `.env.example` now lists only secrets. Non-secret configuration lives in `config.env.example`.
 6. Temporary message timeout configurable via `DELETE_AFTER_TIMEOUT`.
+7. Default SQLite path renamed to `items.db`.
+8. User-facing messages use generic item list wording.
 
 ## [0.3.0] - 2025-06-09
 1. `/info` command shows commit hash and release version or how many commits the build is ahead of the latest release
@@ -33,7 +35,7 @@ All notable changes to this project will be documented in this file.
 
 
 ## [0.1.0] - 2025-06-07
-1. Initial release of the Telegram shopping list bot.
+1. Initial release of the Telegram item list bot.
 2. Each chat has a single list; send text to add items line by line.
 3. Inline checkbox buttons allow marking items as bought.
 4. `/list` shows the current list.
