@@ -58,9 +58,11 @@ pub async fn transcribe_audio(
 
 /// Split a text string into individual items.
 ///
-/// The input is split on commas, newlines and the word "and". Each segment is
-/// cleaned via [`crate::text_utils::parse_item_line`]. Empty segments are
-/// ignored.
+/// The input is split on commas (`","`), newline characters, and the literal
+/// word `"and"`. Each resulting segment is passed through
+/// [`crate::text_utils::parse_item_line`], which trims whitespace and removes
+/// status markers. Empty segments are dropped because `parse_item_line` returns
+/// `None` when nothing remains after cleaning.
 pub fn parse_items(text: &str) -> Vec<String> {
     text.split([',', '\n'])
         .flat_map(|seg| seg.split(" and "))
