@@ -1,12 +1,11 @@
+use crate::db::{Database, Item};
 use anyhow::Result;
-use sqlx::{Pool, Sqlite};
 use teloxide::{
     prelude::*,
     types::{ChatId, InlineKeyboardButton, InlineKeyboardMarkup, Message, MessageId},
 };
 
 use super::list_service::ListService;
-use crate::db::*;
 
 pub fn format_list(items: &[Item]) -> (String, InlineKeyboardMarkup) {
     let mut text = String::new();
@@ -44,12 +43,12 @@ pub fn format_plain_list(items: &[Item]) -> String {
     text
 }
 
-pub async fn send_list(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()> {
+pub async fn send_list(bot: Bot, chat_id: ChatId, db: &Database) -> Result<()> {
     tracing::debug!(chat_id = chat_id.0, "Sending list");
     ListService::new(db).send_list(bot, chat_id).await
 }
 
-pub async fn share_list(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()> {
+pub async fn share_list(bot: Bot, chat_id: ChatId, db: &Database) -> Result<()> {
     tracing::debug!(chat_id = chat_id.0, "Sharing list");
     ListService::new(db).share_list(bot, chat_id).await
 }
@@ -58,7 +57,7 @@ pub async fn update_list_message(
     bot: &Bot,
     chat_id: ChatId,
     message_id: MessageId,
-    db: &Pool<Sqlite>,
+    db: &Database,
 ) -> Result<()> {
     tracing::debug!(
         chat_id = chat_id.0,
@@ -70,28 +69,23 @@ pub async fn update_list_message(
         .await
 }
 
-pub async fn archive(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()> {
+pub async fn archive(bot: Bot, chat_id: ChatId, db: &Database) -> Result<()> {
     tracing::debug!(chat_id = chat_id.0, "Archiving list");
     ListService::new(db).archive(bot, chat_id).await
 }
 
-pub async fn nuke_list(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Result<()> {
+pub async fn nuke_list(bot: Bot, msg: Message, db: &Database) -> Result<()> {
     tracing::debug!(chat_id = msg.chat.id.0, "Nuking list");
     ListService::new(db).nuke(bot, msg).await
 }
 
-pub async fn insert_items<I>(
-    bot: Bot,
-    chat_id: ChatId,
-    db: &Pool<Sqlite>,
-    items: I,
-) -> Result<usize>
+pub async fn insert_items<I>(bot: Bot, chat_id: ChatId, db: &Database, items: I) -> Result<usize>
 where
     I: IntoIterator<Item = String>,
 {
     let mut added = 0usize;
     for item in items {
-        add_item(db, chat_id, &item).await?;
+        db.add_item(chat_id, &item).await?;
         added += 1;
     }
 

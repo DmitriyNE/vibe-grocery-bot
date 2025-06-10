@@ -1,5 +1,5 @@
+use super::Database;
 use anyhow::Result;
-use sqlx::{Pool, Sqlite};
 use std::collections::HashSet;
 use teloxide::types::{ChatId, MessageId};
 
@@ -32,113 +32,111 @@ fn join_selected(set: &HashSet<i64>) -> String {
         .join(",")
 }
 
-pub async fn init_delete_session(db: &Pool<Sqlite>, user_id: i64, chat_id: ChatId) -> Result<()> {
-    tracing::debug!(user_id, chat_id = chat_id.0, "Initializing delete session");
-    sqlx::query(
-        "INSERT INTO delete_session (user_id, chat_id, selected) VALUES (?, ?, '') \
-         ON CONFLICT(user_id) DO UPDATE SET chat_id=excluded.chat_id, selected='', notice_chat_id=NULL, notice_message_id=NULL, dm_message_id=NULL",
-    )
-    .bind(user_id)
-    .bind(chat_id.0)
-    .execute(db)
-    .await?;
-    Ok(())
-}
-
-pub async fn update_delete_selection(
-    db: &Pool<Sqlite>,
-    user_id: i64,
-    selected: &HashSet<i64>,
-) -> Result<()> {
-    tracing::trace!(user_id, selection=?selected, "Updating delete selection");
-    let joined = join_selected(selected);
-    sqlx::query("UPDATE delete_session SET selected = ? WHERE user_id = ?")
-        .bind(joined)
+impl Database {
+    pub async fn init_delete_session(&self, user_id: i64, chat_id: ChatId) -> Result<()> {
+        tracing::debug!(user_id, chat_id = chat_id.0, "Initializing delete session");
+        sqlx::query(
+            "INSERT INTO delete_session (user_id, chat_id, selected) VALUES (?, ?, '') \
+             ON CONFLICT(user_id) DO UPDATE SET chat_id=excluded.chat_id, selected='', notice_chat_id=NULL, notice_message_id=NULL, dm_message_id=NULL",
+        )
         .bind(user_id)
-        .execute(db)
+        .bind(chat_id.0)
+        .execute(self.pool())
         .await?;
-    Ok(())
-}
+        Ok(())
+    }
 
-pub async fn set_delete_notice(
-    db: &Pool<Sqlite>,
-    user_id: i64,
-    chat_id: ChatId,
-    message_id: MessageId,
-) -> Result<()> {
-    tracing::debug!(
-        user_id,
-        chat_id = chat_id.0,
-        message_id = message_id.0,
-        "Setting delete notice",
-    );
-    sqlx::query(
-        "UPDATE delete_session SET notice_chat_id = ?, notice_message_id = ? WHERE user_id = ?",
-    )
-    .bind(chat_id.0)
-    .bind(message_id.0)
-    .bind(user_id)
-    .execute(db)
-    .await?;
-    Ok(())
-}
+    pub async fn update_delete_selection(
+        &self,
+        user_id: i64,
+        selected: &HashSet<i64>,
+    ) -> Result<()> {
+        tracing::trace!(user_id, selection=?selected, "Updating delete selection");
+        let joined = join_selected(selected);
+        sqlx::query("UPDATE delete_session SET selected = ? WHERE user_id = ?")
+            .bind(joined)
+            .bind(user_id)
+            .execute(self.pool())
+            .await?;
+        Ok(())
+    }
 
-pub async fn set_delete_dm_message(
-    db: &Pool<Sqlite>,
-    user_id: i64,
-    message_id: MessageId,
-) -> Result<()> {
-    tracing::debug!(
-        user_id,
-        message_id = message_id.0,
-        "Setting delete DM message"
-    );
-    sqlx::query("UPDATE delete_session SET dm_message_id = ? WHERE user_id = ?")
+    pub async fn set_delete_notice(
+        &self,
+        user_id: i64,
+        chat_id: ChatId,
+        message_id: MessageId,
+    ) -> Result<()> {
+        tracing::debug!(
+            user_id,
+            chat_id = chat_id.0,
+            message_id = message_id.0,
+            "Setting delete notice",
+        );
+        sqlx::query(
+            "UPDATE delete_session SET notice_chat_id = ?, notice_message_id = ? WHERE user_id = ?",
+        )
+        .bind(chat_id.0)
         .bind(message_id.0)
         .bind(user_id)
-        .execute(db)
+        .execute(self.pool())
         .await?;
-    Ok(())
-}
-
-pub async fn get_delete_session(db: &Pool<Sqlite>, user_id: i64) -> Result<Option<DeleteSession>> {
-    tracing::trace!(user_id, "Fetching delete session");
-    if let Some(row) = sqlx::query_as::<_, DeleteSessionRow>(
-        "SELECT chat_id, selected, notice_chat_id, notice_message_id, dm_message_id FROM delete_session WHERE user_id = ?",
-    )
-    .bind(user_id)
-    .fetch_optional(db)
-    .await?
-    {
-        let notice = match (row.notice_chat_id, row.notice_message_id) {
-            (Some(c), Some(m)) => Some((ChatId(c), MessageId(m))),
-            _ => None,
-        };
-        Ok(Some(DeleteSession {
-            chat_id: ChatId(row.chat_id),
-            selected: parse_selected(&row.selected),
-            notice,
-            dm_message_id: row.dm_message_id.map(MessageId),
-        }))
-    } else {
-        Ok(None)
+        Ok(())
     }
-}
 
-pub async fn clear_delete_session(db: &Pool<Sqlite>, user_id: i64) -> Result<()> {
-    tracing::debug!(user_id, "Clearing delete session");
-    sqlx::query("DELETE FROM delete_session WHERE user_id = ?")
+    pub async fn set_delete_dm_message(&self, user_id: i64, message_id: MessageId) -> Result<()> {
+        tracing::debug!(
+            user_id,
+            message_id = message_id.0,
+            "Setting delete DM message"
+        );
+        sqlx::query("UPDATE delete_session SET dm_message_id = ? WHERE user_id = ?")
+            .bind(message_id.0)
+            .bind(user_id)
+            .execute(self.pool())
+            .await?;
+        Ok(())
+    }
+
+    pub async fn get_delete_session(&self, user_id: i64) -> Result<Option<DeleteSession>> {
+        tracing::trace!(user_id, "Fetching delete session");
+        if let Some(row) = sqlx::query_as::<_, DeleteSessionRow>(
+            "SELECT chat_id, selected, notice_chat_id, notice_message_id, dm_message_id FROM delete_session WHERE user_id = ?",
+        )
         .bind(user_id)
-        .execute(db)
-        .await?;
-    Ok(())
+        .fetch_optional(self.pool())
+        .await?
+        {
+            let notice = match (row.notice_chat_id, row.notice_message_id) {
+                (Some(c), Some(m)) => Some((ChatId(c), MessageId(m))),
+                _ => None,
+            };
+            Ok(Some(DeleteSession {
+                chat_id: ChatId(row.chat_id),
+                selected: parse_selected(&row.selected),
+                notice,
+                dm_message_id: row.dm_message_id.map(MessageId),
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub async fn clear_delete_session(&self, user_id: i64) -> Result<()> {
+        tracing::debug!(user_id, "Clearing delete session");
+        sqlx::query("DELETE FROM delete_session WHERE user_id = ?")
+            .bind(user_id)
+            .execute(self.pool())
+            .await?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    use sqlx::{sqlite::SqlitePoolOptions, Pool, Sqlite};
+    use sqlx::sqlite::SqlitePoolOptions;
     use teloxide::types::{ChatId, MessageId};
 
     #[test]
@@ -189,8 +187,8 @@ mod tests {
         }
     }
 
-    async fn setup_db() -> Pool<Sqlite> {
-        let db = SqlitePoolOptions::new()
+    async fn setup_db() -> Database {
+        let pool = SqlitePoolOptions::new()
             .max_connections(1)
             .connect("sqlite::memory:")
             .await
@@ -206,11 +204,11 @@ mod tests {
                 dm_message_id INTEGER
             )",
         )
-        .execute(&db)
+        .execute(&pool)
         .await
         .unwrap();
 
-        db
+        Database::new(pool)
     }
 
     #[tokio::test]
@@ -218,9 +216,9 @@ mod tests {
         let db = setup_db().await;
         let user = 1i64;
         let chat_a = ChatId(10);
-        init_delete_session(&db, user, chat_a).await?;
+        db.init_delete_session(user, chat_a).await?;
 
-        let mut session = get_delete_session(&db, user).await?.unwrap();
+        let mut session = db.get_delete_session(user).await?.unwrap();
         assert_eq!(session.chat_id, chat_a);
         assert!(session.selected.is_empty());
         assert!(session.notice.is_none());
@@ -229,20 +227,20 @@ mod tests {
         let mut selected = HashSet::new();
         selected.insert(5);
         selected.insert(7);
-        update_delete_selection(&db, user, &selected).await?;
+        db.update_delete_selection(user, &selected).await?;
 
-        session = get_delete_session(&db, user).await?.unwrap();
+        session = db.get_delete_session(user).await?.unwrap();
         assert_eq!(session.selected, selected);
 
-        set_delete_notice(&db, user, ChatId(20), MessageId(3)).await?;
-        set_delete_dm_message(&db, user, MessageId(4)).await?;
+        db.set_delete_notice(user, ChatId(20), MessageId(3)).await?;
+        db.set_delete_dm_message(user, MessageId(4)).await?;
 
-        session = get_delete_session(&db, user).await?.unwrap();
+        session = db.get_delete_session(user).await?.unwrap();
         assert_eq!(session.notice, Some((ChatId(20), MessageId(3))));
         assert_eq!(session.dm_message_id, Some(MessageId(4)));
 
-        clear_delete_session(&db, user).await?;
-        assert!(get_delete_session(&db, user).await?.is_none());
+        db.clear_delete_session(user).await?;
+        assert!(db.get_delete_session(user).await?.is_none());
 
         Ok(())
     }

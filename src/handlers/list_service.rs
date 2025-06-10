@@ -1,28 +1,27 @@
 use anyhow::Result;
-use sqlx::{Pool, Sqlite};
 use teloxide::{
     prelude::*,
     types::{ChatId, InlineKeyboardButton, InlineKeyboardMarkup, Message, MessageId},
 };
 
 use super::list::{format_list, format_plain_list};
-use crate::db::*;
+use crate::db::Database;
 
 pub struct ListService<'a> {
-    db: &'a Pool<Sqlite>,
+    db: &'a Database,
 }
 
 impl<'a> ListService<'a> {
-    pub fn new(db: &'a Pool<Sqlite>) -> Self {
+    pub fn new(db: &'a Database) -> Self {
         Self { db }
     }
 
     pub async fn send_list(&self, bot: Bot, chat_id: ChatId) -> Result<()> {
-        if let Some(msg_id) = get_last_list_message_id(self.db, chat_id).await? {
+        if let Some(msg_id) = self.db.get_last_list_message_id(chat_id).await? {
             let _ = bot.delete_message(chat_id, MessageId(msg_id)).await;
         }
 
-        let items = list_items(self.db, chat_id).await?;
+        let items = self.db.list_items(chat_id).await?;
         if items.is_empty() {
             let sent = bot
                 .send_message(
@@ -30,7 +29,9 @@ impl<'a> ListService<'a> {
                     "Your shopping list is empty! Send any message to add an item.",
                 )
                 .await?;
-            update_last_list_message_id(self.db, chat_id, sent.id).await?;
+            self.db
+                .update_last_list_message_id(chat_id, sent.id)
+                .await?;
             return Ok(());
         }
 
@@ -39,12 +40,14 @@ impl<'a> ListService<'a> {
             .send_message(chat_id, text)
             .reply_markup(keyboard)
             .await?;
-        update_last_list_message_id(self.db, chat_id, sent.id).await?;
+        self.db
+            .update_last_list_message_id(chat_id, sent.id)
+            .await?;
         Ok(())
     }
 
     pub async fn share_list(&self, bot: Bot, chat_id: ChatId) -> Result<()> {
-        let items = list_items(self.db, chat_id).await?;
+        let items = self.db.list_items(chat_id).await?;
         if items.is_empty() {
             bot.send_message(chat_id, "Your shopping list is empty!")
                 .await?;
@@ -61,7 +64,7 @@ impl<'a> ListService<'a> {
         chat_id: ChatId,
         message_id: MessageId,
     ) -> Result<()> {
-        let items = list_items(self.db, chat_id).await?;
+        let items = self.db.list_items(chat_id).await?;
         if items.is_empty() {
             let _ = bot
                 .edit_message_text(chat_id, message_id, "List is now empty!")
@@ -81,7 +84,7 @@ impl<'a> ListService<'a> {
     }
 
     pub async fn archive(&self, bot: Bot, chat_id: ChatId) -> Result<()> {
-        let last_message_id = match get_last_list_message_id(self.db, chat_id).await? {
+        let last_message_id = match self.db.get_last_list_message_id(chat_id).await? {
             Some(id) => id,
             None => {
                 bot.send_message(chat_id, "There is no active list to archive.")
@@ -90,7 +93,7 @@ impl<'a> ListService<'a> {
             }
         };
 
-        let items = list_items(self.db, chat_id).await?;
+        let items = self.db.list_items(chat_id).await?;
         if items.is_empty() {
             bot.send_message(chat_id, "There is no active list to archive.")
                 .await?;
@@ -107,8 +110,8 @@ impl<'a> ListService<'a> {
             ))
             .await;
 
-        delete_all_items(self.db, chat_id).await?;
-        clear_last_list_message_id(self.db, chat_id).await?;
+        self.db.delete_all_items(chat_id).await?;
+        self.db.clear_last_list_message_id(chat_id).await?;
 
         bot.send_message(chat_id, "List archived! Send a message to start a new one.")
             .await?;
@@ -117,13 +120,13 @@ impl<'a> ListService<'a> {
 
     pub async fn nuke(&self, bot: Bot, msg: Message) -> Result<()> {
         let _ = bot.delete_message(msg.chat.id, msg.id).await;
-        if let Some(list_message_id) = get_last_list_message_id(self.db, msg.chat.id).await? {
+        if let Some(list_message_id) = self.db.get_last_list_message_id(msg.chat.id).await? {
             let _ = bot
                 .delete_message(msg.chat.id, MessageId(list_message_id))
                 .await;
         }
-        delete_all_items(self.db, msg.chat.id).await?;
-        clear_last_list_message_id(self.db, msg.chat.id).await?;
+        self.db.delete_all_items(msg.chat.id).await?;
+        self.db.clear_last_list_message_id(msg.chat.id).await?;
         let confirmation = bot
             .send_message(msg.chat.id, "The active list has been nuked.")
             .await?;
