@@ -16,7 +16,14 @@ pub fn delete_after(bot: Bot, chat_id: ChatId, message_id: MessageId, secs: u64)
     );
     tokio::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_secs(secs)).await;
-        let _ = bot.delete_message(chat_id, message_id).await;
+        if let Err(err) = bot.delete_message(chat_id, message_id).await {
+            tracing::warn!(
+                error = %err,
+                chat_id = chat_id.0,
+                message_id = message_id.0,
+                "Failed to delete message",
+            );
+        }
     });
 }
 
