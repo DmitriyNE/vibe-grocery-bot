@@ -44,13 +44,26 @@ fn ai_config_from_env_custom_models() {
 #[serial]
 fn config_from_env_calls_ai_constructor() {
     std::env::set_var("DB_URL", "db");
+    std::env::remove_var("DB_POOL_SIZE");
     std::env::set_var("OPENAI_API_KEY", "k");
     std::env::remove_var("OPENAI_STT_MODEL");
     std::env::remove_var("OPENAI_GPT_MODEL");
     std::env::remove_var("OPENAI_VISION_MODEL");
     let cfg = Config::from_env();
     assert_eq!(cfg.db_url, "db");
+    assert_eq!(cfg.db_pool_size, 5);
     let ai = cfg.ai.unwrap();
     assert_eq!(ai.api_key, "k");
     assert_eq!(ai.stt_model, "whisper-1");
+}
+
+#[test]
+#[serial]
+fn config_from_env_custom_pool_size() {
+    std::env::set_var("DB_URL", "db");
+    std::env::set_var("DB_POOL_SIZE", "2");
+    std::env::remove_var("OPENAI_API_KEY");
+    let cfg = Config::from_env();
+    assert_eq!(cfg.db_pool_size, 2);
+    assert!(cfg.ai.is_none());
 }

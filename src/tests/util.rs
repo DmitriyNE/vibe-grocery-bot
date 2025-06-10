@@ -1,10 +1,7 @@
-use crate::db::Database;
-use sqlx::sqlite::SqlitePoolOptions;
+use crate::db::{connect_db, Database};
 
 pub async fn init_test_db() -> Database {
-    let pool = SqlitePoolOptions::new()
-        .max_connections(1)
-        .connect("sqlite::memory:")
+    let pool = connect_db("sqlite::memory:", 1)
         .await
         .expect("failed to create in-memory database");
 

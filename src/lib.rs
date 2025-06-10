@@ -54,7 +54,7 @@ pub async fn run() -> Result<()> {
 
     tracing::info!("Connecting to database at: {}", &db_url);
 
-    let pool = db::connect_db(&db_url).await?;
+    let pool = db::connect_db(&db_url, config.db_pool_size).await?;
     let db = db::Database::new(pool);
 
     tracing::info!("Database connection successful.");

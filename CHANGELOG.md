@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 1. Add index on `items.chat_id` to speed up queries.
 2. Vision model configurable via `OPENAI_VISION_MODEL`.
+3. Database pool size configurable via `DB_POOL_SIZE`.
 
 ## [0.3.0] - 2025-06-09
 1. `/info` command shows commit hash and release version or how many commits the build is ahead of the latest release
