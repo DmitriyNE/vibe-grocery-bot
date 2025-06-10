@@ -15,7 +15,7 @@ struct TranscriptionResponse {
     text: String,
 }
 
-const OPENAI_URL: &str = "https://api.openai.com/v1/audio/transcriptions";
+const OPENAI_STT_URL: &str = "https://api.openai.com/v1/audio/transcriptions";
 
 #[instrument(level = "trace", skip(api_key, bytes))]
 async fn transcribe_audio_inner(
@@ -52,7 +52,7 @@ pub async fn transcribe_audio(
     bytes: &[u8],
     url: Option<&str>,
 ) -> Result<String> {
-    let url = url.unwrap_or(OPENAI_URL);
+    let url = url.unwrap_or(OPENAI_STT_URL);
     transcribe_audio_inner(model, api_key, prompt, bytes, url).await
 }
 
