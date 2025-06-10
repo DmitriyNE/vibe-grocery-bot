@@ -43,7 +43,7 @@ Set these environment variables before running:
 - `OPENAI_CHAT_URL` – optional URL for the chat completion API
 - `OPENAI_STT_URL` – optional URL for the transcription API
 
-The database file is created automatically if needed. Embedded SQLx migrations in the `migrations/` directory are executed on startup.
+The database file is created automatically if needed. Embedded SQLx migrations in the `migrations/` directory are executed on startup. When deploying on Fly.io, set `DB_URL` to `sqlite:///data/shopping.db` to match `fly.toml`.
 
 ## Running
 
