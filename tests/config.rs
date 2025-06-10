@@ -1,7 +1,10 @@
 use shopbot::ai::config::AiConfig;
 use shopbot::Config;
 
+use serial_test::serial;
+
 #[test]
+#[serial]
 fn ai_config_from_env_missing_key() {
     std::env::remove_var("OPENAI_API_KEY");
     std::env::remove_var("OPENAI_STT_MODEL");
@@ -11,6 +14,7 @@ fn ai_config_from_env_missing_key() {
 }
 
 #[test]
+#[serial]
 fn ai_config_from_env_defaults() {
     std::env::set_var("OPENAI_API_KEY", "k");
     std::env::remove_var("OPENAI_STT_MODEL");
@@ -24,6 +28,7 @@ fn ai_config_from_env_defaults() {
 }
 
 #[test]
+#[serial]
 fn ai_config_from_env_custom_models() {
     std::env::set_var("OPENAI_API_KEY", "k");
     std::env::set_var("OPENAI_STT_MODEL", "s");
@@ -36,6 +41,7 @@ fn ai_config_from_env_custom_models() {
 }
 
 #[test]
+#[serial]
 fn config_from_env_calls_ai_constructor() {
     std::env::set_var("DB_URL", "db");
     std::env::set_var("OPENAI_API_KEY", "k");
