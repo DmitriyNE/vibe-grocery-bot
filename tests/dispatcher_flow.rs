@@ -31,6 +31,7 @@ async fn dispatcher_add_then_list() {
     let bot = Bot::new("TEST").set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
     let db = init_test_db().await;
     let ai_config: Option<shopbot::ai::config::AiConfig> = None;
+    let delete_after_timeout = 5u64;
 
     let handler = dptree::entry()
         .branch(Update::filter_callback_query().endpoint(shopbot::callback_handler))
@@ -51,14 +52,20 @@ async fn dispatcher_add_then_list() {
                      msg: Message,
                      cmd: Command,
                      db: shopbot::db::Database,
-                     ai_config: Option<shopbot::ai::config::AiConfig>| async move {
+                     ai_config: Option<shopbot::ai::config::AiConfig>,
+                     delete_after_timeout: u64| async move {
                         match cmd {
                             Command::Start | Command::Help => shopbot::help(bot, msg).await?,
                             Command::List => shopbot::send_list(bot, msg.chat.id, &db).await?,
                             Command::Archive => shopbot::archive(bot, msg.chat.id, &db).await?,
-                            Command::Delete => shopbot::enter_delete_mode(bot, msg, &db).await?,
+                            Command::Delete => {
+                                shopbot::enter_delete_mode(bot, msg, &db, delete_after_timeout)
+                                    .await?
+                            }
                             Command::Share => shopbot::share_list(bot, msg.chat.id, &db).await?,
-                            Command::Nuke => shopbot::nuke_list(bot, msg, &db).await?,
+                            Command::Nuke => {
+                                shopbot::nuke_list(bot, msg, &db, delete_after_timeout).await?
+                            }
                             Command::Parse => {
                                 shopbot::add_items_from_parsed_text(bot, msg, db, ai_config).await?
                             }
@@ -101,11 +108,19 @@ async fn dispatcher_add_then_list() {
             bot.clone(),
             me.clone(),
             db.clone(),
-            ai_config.clone()
+            ai_config.clone(),
+            delete_after_timeout
         ])
         .await;
     let _ = handler
-        .dispatch(dptree::deps![list_update, bot, me, db, ai_config])
+        .dispatch(dptree::deps![
+            list_update,
+            bot,
+            me,
+            db,
+            ai_config,
+            delete_after_timeout
+        ])
         .await;
 
     server.verify().await;

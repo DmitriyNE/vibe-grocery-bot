@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 3. Custom OpenAI endpoints via `OPENAI_CHAT_URL` and `OPENAI_STT_URL`.
 4. Database pool size configurable via `DB_POOL_SIZE`.
 5. Example environment file `.env.example` documents all config variables.
+6. Temporary message timeout configurable via `DELETE_AFTER_TIMEOUT`.
 
 ## [0.3.0] - 2025-06-09
 1. `/info` command shows commit hash and release version or how many commits the build is ahead of the latest release

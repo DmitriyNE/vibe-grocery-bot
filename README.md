@@ -35,6 +35,7 @@ Set these environment variables before running:
 - `TELOXIDE_TOKEN` – Telegram bot token from @BotFather
 - `DB_URL` – optional SQLite connection string (defaults to `sqlite:shopping.db`)
 - `DB_POOL_SIZE` – optional maximum number of SQLite connections (defaults to `5`)
+- `DELETE_AFTER_TIMEOUT` – optional delay in seconds before temporary messages are deleted (defaults to `5`)
 - `RUST_LOG` – optional logging level (e.g. `info` or `debug`)
 - `OPENAI_API_KEY` – optional API key for enabling voice and photo recognition
 - `OPENAI_STT_MODEL` – optional model name (`whisper-1`, `gpt-4o-mini-transcribe`, or `gpt-4o-transcribe`)

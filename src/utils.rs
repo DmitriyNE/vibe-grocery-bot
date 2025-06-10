@@ -7,7 +7,7 @@ use teloxide::{
 };
 
 /// Default timeout in seconds for temporary messages.
-pub const DELETE_AFTER_TIMEOUT: u64 = 5;
+pub const DEFAULT_DELETE_AFTER_TIMEOUT: u64 = 5;
 
 /// Delete a message after the given delay in seconds.
 pub fn delete_after(

@@ -87,3 +87,25 @@ fn config_from_env_custom_pool_size() {
     assert_eq!(cfg.db_pool_size, 2);
     assert!(cfg.ai.is_none());
 }
+
+#[test]
+#[serial]
+fn config_from_env_default_delete_after_timeout() {
+    std::env::remove_var("DELETE_AFTER_TIMEOUT");
+    std::env::set_var("DB_URL", "db");
+    std::env::remove_var("OPENAI_API_KEY");
+    let cfg = Config::from_env();
+    assert_eq!(cfg.delete_after_timeout, 5);
+    assert!(cfg.ai.is_none());
+}
+
+#[test]
+#[serial]
+fn config_from_env_custom_delete_after_timeout() {
+    std::env::set_var("DELETE_AFTER_TIMEOUT", "10");
+    std::env::set_var("DB_URL", "db");
+    std::env::remove_var("OPENAI_API_KEY");
+    let cfg = Config::from_env();
+    assert_eq!(cfg.delete_after_timeout, 10);
+    assert!(cfg.ai.is_none());
+}
