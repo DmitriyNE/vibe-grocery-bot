@@ -31,10 +31,18 @@ pub fn parse_item_line(line: &str) -> Option<String> {
     }
 }
 
+use unicode_segmentation::UnicodeSegmentation;
+
 pub fn capitalize_first(text: &str) -> String {
-    let mut chars = text.chars();
-    match chars.next() {
-        Some(c) => c.to_uppercase().chain(chars).collect(),
+    let mut graphemes = text.graphemes(true);
+    match graphemes.next() {
+        Some(first) => {
+            let mut result = first.to_uppercase();
+            for g in graphemes {
+                result.push_str(g);
+            }
+            result
+        }
         None => String::new(),
     }
 }
@@ -51,4 +59,19 @@ pub fn normalize_for_match(text: &str) -> String {
     let result = trimmed.to_lowercase();
     trace!(original = %text, normalized = %result, "normalized for match");
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn capitalize_accented() {
+        assert_eq!(capitalize_first("éclair"), "Éclair");
+    }
+
+    #[test]
+    fn capitalize_with_emoji() {
+        assert_eq!(capitalize_first("🍎 apple"), "🍎 apple");
+    }
 }
