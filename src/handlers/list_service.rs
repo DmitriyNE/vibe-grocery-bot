@@ -169,12 +169,12 @@ impl<'a> ListService<'a> {
         self.db.delete_all_items(msg.chat.id).await?;
         self.db.clear_last_list_message_id(msg.chat.id).await?;
         let confirmation = bot.send_message(msg.chat.id, LIST_NUKED).await?;
-        crate::delete_after(
+        drop(crate::delete_after(
             bot.clone(),
             confirmation.chat.id,
             confirmation.id,
             crate::utils::DELETE_AFTER_TIMEOUT,
-        );
+        ));
         Ok(())
     }
 }
