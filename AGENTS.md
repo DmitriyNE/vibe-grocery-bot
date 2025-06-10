@@ -17,6 +17,7 @@
 - Release commits may update the manifest version to match the release's semver. After the release PR is merged, a maintainer tags that commit. The next PR should then bump the version to the next patch level and start a fresh `## Unreleased` section in `CHANGELOG.md`.
 - When updating versions in manifests, increment the patch version.
 - This is a generic list bot. Avoid hardcoding references to "groceries" in prompts or logs. Use generic "items" wording instead.
+- The bot's historic name is "Vibe Grocery Bot", but documentation and code should still refer to items generically.
 - Follow the modern Rust module layout: define a `name.rs` file alongside a
   `name/` directory for submodules instead of using `mod.rs`.
 

@@ -2,7 +2,7 @@
 
 **WARNING: THIS ENTIRE PROJECT WAS VIBECODED WITH ONLY HOMEOPATHIC HUMAN EDITS!**
 
-Vibe Grocery Bot is a small Telegram bot for managing a shared shopping list. Each chat—whether a group or a private conversation—gets its own independent list.
+Vibe Grocery Bot is a small Telegram bot for managing a shared list of items. Each chat—whether a group or a private conversation—gets its own independent list.
 
 ## Usage
 
