@@ -24,10 +24,10 @@ pub fn prepare_sqlite_url(url: &str) -> String {
     }
 }
 
-pub async fn connect_db(db_url: &str) -> Result<Pool<Sqlite>> {
-    tracing::debug!(db_url = %db_url, "Connecting to database");
+pub async fn connect_db(db_url: &str, pool_size: u32) -> Result<Pool<Sqlite>> {
+    tracing::debug!(db_url = %db_url, pool_size, "Connecting to database");
     Ok(SqlitePoolOptions::new()
-        .max_connections(5)
+        .max_connections(pool_size)
         .connect(db_url)
         .await?)
 }

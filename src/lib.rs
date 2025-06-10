@@ -1,7 +1,8 @@
 use anyhow::Result;
-use teloxide::{prelude::*, utils::command::BotCommands};
+use teloxide::prelude::*;
 
 pub mod ai;
+mod commands;
 mod config;
 pub mod db;
 mod handlers;
@@ -14,19 +15,18 @@ pub mod tests;
 
 pub use ai::gpt::parse_items_gpt;
 pub use ai::stt::parse_items;
+pub use commands::Command;
 pub use config::Config;
 pub use db::Item;
-pub use handlers::{format_delete_list, format_list, format_plain_list, insert_items};
+pub use handlers::{
+    add_items_from_parsed_text, add_items_from_photo, add_items_from_text, add_items_from_voice,
+    archive, callback_handler, enter_delete_mode, format_delete_list, format_list,
+    format_plain_list, help, insert_items, nuke_list, send_list, share_list, show_system_info,
+};
 pub use messages::*;
 pub use system_info::get_system_info;
 pub use text_utils::{capitalize_first, normalize_for_match, parse_item_line};
 pub use utils::delete_after;
-
-use handlers::{
-    add_items_from_parsed_text, add_items_from_photo, add_items_from_text, add_items_from_voice,
-    archive, callback_handler, enter_delete_mode, help, nuke_list, send_list, share_list,
-    show_system_info,
-};
 
 pub async fn run() -> Result<()> {
     let config = Config::from_env();
@@ -54,7 +54,7 @@ pub async fn run() -> Result<()> {
 
     tracing::info!("Connecting to database at: {}", &db_url);
 
-    let pool = db::connect_db(&db_url).await?;
+    let pool = db::connect_db(&db_url, config.db_pool_size).await?;
     let db = db::Database::new(pool);
 
     tracing::info!("Database connection successful.");
@@ -62,31 +62,7 @@ pub async fn run() -> Result<()> {
     sqlx::migrate!("./migrations").run(&*db).await?;
 
     // --- Command Enum ---
-    #[derive(BotCommands, Clone)]
-    #[command(
-        rename_rule = "lowercase",
-        description = "These commands are supported:"
-    )]
-    enum Command {
-        #[command(description = "display this text.")]
-        Start,
-        #[command(description = "display this text.")]
-        Help,
-        #[command(description = "show the current shopping list.")]
-        List,
-        #[command(description = "finalize and archive the current list, starting a new one.")]
-        Archive,
-        #[command(description = "show a temporary panel to delete items from the list.")]
-        Delete,
-        #[command(description = "send the list as plain text for copying.")]
-        Share,
-        #[command(description = "completely delete the current list.")]
-        Nuke,
-        #[command(description = "parse items from the given text using GPT.")]
-        Parse,
-        #[command(description = "show system information.")]
-        Info,
-    }
+    // defined in the commands module
 
     // --- Handler Setup ---
     let handler = dptree::entry()

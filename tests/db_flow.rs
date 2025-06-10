@@ -45,3 +45,22 @@ async fn last_message_id_roundtrip() -> Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn delete_multiple_items() -> Result<()> {
+    let db = init_test_db().await;
+    let chat = ChatId(2);
+    for i in 0..3 {
+        db.add_item(chat, &format!("Item {i}")).await?;
+    }
+
+    let items = db.list_items(chat).await?;
+    let ids: Vec<i64> = items.iter().map(|i| i.id).collect();
+
+    db.delete_items(chat, &ids).await?;
+
+    let remaining = db.list_items(chat).await?;
+    assert!(remaining.is_empty());
+
+    Ok(())
+}

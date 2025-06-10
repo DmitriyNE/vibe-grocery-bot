@@ -64,14 +64,19 @@ impl Database {
             return Ok(());
         }
 
-        let mut sql = String::from("DELETE FROM items WHERE chat_id = ? AND id IN (");
-        sql.push_str(&vec!["?"; ids.len()].join(", "));
-        sql.push(')');
-        let mut query = sqlx::query(&sql).bind(chat_id.0);
-        for id in ids {
-            query = query.bind(id);
+        let mut builder =
+            sqlx::QueryBuilder::<sqlx::Sqlite>::new("DELETE FROM items WHERE chat_id = ");
+        builder.push_bind(chat_id.0);
+        builder.push(" AND id IN (");
+        {
+            let mut separated = builder.separated(", ");
+            for id in ids {
+                separated.push_bind(id);
+            }
         }
-        query.execute(self.pool()).await?;
+        builder.push(")");
+
+        builder.build().execute(self.pool()).await?;
         Ok(())
     }
 }
