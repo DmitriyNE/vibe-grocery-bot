@@ -10,7 +10,12 @@ use teloxide::{
 pub const DELETE_AFTER_TIMEOUT: u64 = 5;
 
 /// Delete a message after the given delay in seconds.
-pub fn delete_after(bot: Bot, chat_id: ChatId, message_id: MessageId, secs: u64) {
+pub fn delete_after(
+    bot: Bot,
+    chat_id: ChatId,
+    message_id: MessageId,
+    secs: u64,
+) -> tokio::task::JoinHandle<()> {
     tracing::debug!(
         chat_id = chat_id.0,
         message_id = message_id.0,
@@ -19,7 +24,8 @@ pub fn delete_after(bot: Bot, chat_id: ChatId, message_id: MessageId, secs: u64)
     );
     tokio::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_secs(secs)).await;
-        if let Err(err) = bot.delete_message(chat_id, message_id).await {
+        let res = bot.delete_message(chat_id, message_id).await;
+        if let Err(ref err) = res {
             tracing::warn!(
                 error = %err,
                 chat_id = chat_id.0,
@@ -27,7 +33,12 @@ pub fn delete_after(bot: Bot, chat_id: ChatId, message_id: MessageId, secs: u64)
                 "Failed to delete message",
             );
         }
-    });
+        tracing::debug!(
+            chat_id = chat_id.0,
+            message_id = message_id.0,
+            "Finished delete_after task"
+        );
+    })
 }
 
 /// Download a file from Telegram and return the raw bytes.
