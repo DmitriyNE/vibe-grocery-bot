@@ -6,6 +6,10 @@ use teloxide::{
 };
 
 use crate::db::*;
+use crate::messages::{
+    ARCHIVED_LIST_HEADER, LIST_ARCHIVED, LIST_EMPTY, LIST_EMPTY_ADD_ITEM, LIST_NOW_EMPTY,
+    LIST_NUKED, NO_ACTIVE_LIST_TO_ARCHIVE,
+};
 
 pub fn format_list(items: &[Item]) -> (String, InlineKeyboardMarkup) {
     let mut text = String::new();
@@ -57,12 +61,7 @@ pub async fn send_list(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<(
     );
 
     if items.is_empty() {
-        let sent_msg = bot
-            .send_message(
-                chat_id,
-                "Your shopping list is empty! Send any message to add an item.",
-            )
-            .await?;
+        let sent_msg = bot.send_message(chat_id, LIST_EMPTY_ADD_ITEM).await?;
         update_last_list_message_id(db, chat_id, sent_msg.id).await?;
         return Ok(());
     }
@@ -83,8 +82,7 @@ pub async fn share_list(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<
     tracing::debug!(chat_id = chat_id.0, "Sharing list");
     let items = list_items(db, chat_id).await?;
     if items.is_empty() {
-        bot.send_message(chat_id, "Your shopping list is empty!")
-            .await?;
+        bot.send_message(chat_id, LIST_EMPTY).await?;
         return Ok(());
     }
 
@@ -110,7 +108,7 @@ pub async fn update_list_message(
 
     if items.is_empty() {
         let _ = bot
-            .edit_message_text(chat_id, message_id, "List is now empty!")
+            .edit_message_text(chat_id, message_id, LIST_NOW_EMPTY)
             .reply_markup(InlineKeyboardMarkup::new(
                 Vec::<Vec<InlineKeyboardButton>>::new(),
             ))
@@ -133,21 +131,19 @@ pub async fn archive(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()>
     let last_message_id = match get_last_list_message_id(db, chat_id).await? {
         Some(id) => id,
         None => {
-            bot.send_message(chat_id, "There is no active list to archive.")
-                .await?;
+            bot.send_message(chat_id, NO_ACTIVE_LIST_TO_ARCHIVE).await?;
             return Ok(());
         }
     };
 
     let items = list_items(db, chat_id).await?;
     if items.is_empty() {
-        bot.send_message(chat_id, "There is no active list to archive.")
-            .await?;
+        bot.send_message(chat_id, NO_ACTIVE_LIST_TO_ARCHIVE).await?;
         return Ok(());
     }
 
     let (final_text, _) = format_list(&items);
-    let archived_text = format!("--- Archived List ---\n{}", final_text);
+    let archived_text = format!("{ARCHIVED_LIST_HEADER}\n{}", final_text);
 
     let _ = bot
         .edit_message_text(chat_id, MessageId(last_message_id), archived_text)
@@ -159,8 +155,7 @@ pub async fn archive(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()>
     delete_all_items(db, chat_id).await?;
     clear_last_list_message_id(db, chat_id).await?;
 
-    bot.send_message(chat_id, "List archived! Send a message to start a new one.")
-        .await?;
+    bot.send_message(chat_id, LIST_ARCHIVED).await?;
 
     Ok(())
 }
@@ -178,9 +173,7 @@ pub async fn nuke_list(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Result<()> 
     delete_all_items(db, msg.chat.id).await?;
     clear_last_list_message_id(db, msg.chat.id).await?;
 
-    let confirmation = bot
-        .send_message(msg.chat.id, "The active list has been nuked.")
-        .await?;
+    let confirmation = bot.send_message(msg.chat.id, LIST_NUKED).await?;
     crate::delete_after(bot.clone(), confirmation.chat.id, confirmation.id, 5);
 
     Ok(())
