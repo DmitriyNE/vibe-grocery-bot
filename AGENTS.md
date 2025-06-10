@@ -1,6 +1,6 @@
 # Instructions for Codex agents
 
-- Always run `cargo fmt --all -- --check`, `cargo clippy --all-targets --all-features -- -D warnings`, and `cargo test --all --no-fail-fast` before committing.
+- Always run `cargo fmt --all -- --check`, `cargo clippy --all-targets --all-features -- -D warnings`, and `cargo nextest run --all` before committing.
 - Use clear commit messages that describe the change.
 - Avoid comments for obvious code. Only add comments where they improve
   understanding of non-trivial logic.
