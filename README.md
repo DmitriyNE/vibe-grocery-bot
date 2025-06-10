@@ -30,14 +30,22 @@ Send any message to the bot. Every non-empty line becomes an item. If you send a
 
 ## Configuration
 
-Set these environment variables before running:
+Copy `.env.example` to `.env` and fill in the secret values. Upload them on Fly.io with:
 
-- `TELOXIDE_TOKEN` – Telegram bot token from @BotFather
+```bash
+fly secrets import < .env
+```
+
+Non-secret settings can be customised via environment variables. `config.env.example` lists the available options.
+
+Set these variables as needed before running:
+
+- `TELOXIDE_TOKEN` – Telegram bot token from @BotFather (secret)
 - `DB_URL` – optional SQLite connection string (defaults to `sqlite:shopping.db`)
 - `DB_POOL_SIZE` – optional maximum number of SQLite connections (defaults to `5`)
 - `DELETE_AFTER_TIMEOUT` – optional delay in seconds before temporary messages are deleted (defaults to `5`)
 - `RUST_LOG` – optional logging level (e.g. `info` or `debug`)
-- `OPENAI_API_KEY` – optional API key for enabling voice and photo recognition
+- `OPENAI_API_KEY` – optional API key for enabling voice and photo recognition (secret)
 - `OPENAI_STT_MODEL` – optional model name (`whisper-1`, `gpt-4o-mini-transcribe`, or `gpt-4o-transcribe`)
 - `OPENAI_GPT_MODEL` – optional chat model name (defaults to `gpt-4.1`)
 - `OPENAI_VISION_MODEL` – optional vision model name (defaults to `gpt-4o`)
