@@ -16,17 +16,15 @@ pub use ai::gpt::parse_items_gpt;
 pub use ai::stt::parse_items;
 pub use config::Config;
 pub use db::Item;
-pub use handlers::{format_delete_list, format_list, format_plain_list, insert_items};
+pub use handlers::{
+    add_items_from_parsed_text, add_items_from_photo, add_items_from_text, add_items_from_voice,
+    archive, callback_handler, enter_delete_mode, format_delete_list, format_list,
+    format_plain_list, help, insert_items, nuke_list, send_list, share_list, show_system_info,
+};
 pub use messages::*;
 pub use system_info::get_system_info;
 pub use text_utils::{capitalize_first, normalize_for_match, parse_item_line};
 pub use utils::delete_after;
-
-use handlers::{
-    add_items_from_parsed_text, add_items_from_photo, add_items_from_text, add_items_from_voice,
-    archive, callback_handler, enter_delete_mode, help, nuke_list, send_list, share_list,
-    show_system_info,
-};
 
 pub async fn run() -> Result<()> {
     let config = Config::from_env();
