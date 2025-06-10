@@ -1,5 +1,4 @@
 use anyhow::Result;
-use sqlx::{Pool, Sqlite};
 use teloxide::{prelude::*, utils::command::BotCommands};
 
 pub mod ai;
@@ -53,11 +52,12 @@ pub async fn run() -> Result<()> {
 
     tracing::info!("Connecting to database at: {}", &db_url);
 
-    let db = db::connect_db(&db_url).await?;
+    let pool = db::connect_db(&db_url).await?;
+    let db = db::Database::new(pool);
 
     tracing::info!("Database connection successful.");
 
-    sqlx::migrate!("./migrations").run(&db).await?;
+    sqlx::migrate!("./migrations").run(&*db).await?;
 
     // --- Command Enum ---
     #[derive(BotCommands, Clone)]
@@ -105,7 +105,7 @@ pub async fn run() -> Result<()> {
                     |bot: Bot,
                      msg: Message,
                      cmd: Command,
-                     db: Pool<Sqlite>,
+                     db: db::Database,
                      ai_config: Option<crate::ai::config::AiConfig>| async move {
                         match cmd {
                             Command::Start | Command::Help => help(bot, msg).await?,
@@ -139,7 +139,6 @@ pub async fn run() -> Result<()> {
 #[cfg(test)]
 mod lib_tests {
     use super::*;
-    use crate::db::*;
     use crate::tests::util::init_test_db;
     use teloxide::types::MessageId;
 
@@ -148,24 +147,24 @@ mod lib_tests {
         let db = init_test_db().await;
         let chat = ChatId(42);
 
-        add_item(&db, chat, "Apples").await?;
-        add_item(&db, chat, "Milk").await?;
+        db.add_item(chat, "Apples").await?;
+        db.add_item(chat, "Milk").await?;
 
-        let mut items = list_items(&db, chat).await?;
+        let mut items = db.list_items(chat).await?;
         assert_eq!(items.len(), 2);
         assert_eq!(items[0].text, "Apples");
         assert!(!items[0].done);
 
-        toggle_item(&db, items[0].id).await?;
-        items = list_items(&db, chat).await?;
+        db.toggle_item(items[0].id).await?;
+        items = db.list_items(chat).await?;
         assert!(items[0].done);
 
-        delete_item(&db, items[1].id).await?;
-        items = list_items(&db, chat).await?;
+        db.delete_item(items[1].id).await?;
+        items = db.list_items(chat).await?;
         assert_eq!(items.len(), 1);
 
-        delete_all_items(&db, chat).await?;
-        items = list_items(&db, chat).await?;
+        db.delete_all_items(chat).await?;
+        items = db.list_items(chat).await?;
         assert!(items.is_empty());
 
         Ok(())
@@ -176,13 +175,13 @@ mod lib_tests {
         let db = init_test_db().await;
         let chat = ChatId(1);
 
-        assert!(get_last_list_message_id(&db, chat).await?.is_none());
+        assert!(db.get_last_list_message_id(chat).await?.is_none());
 
-        update_last_list_message_id(&db, chat, MessageId(99)).await?;
-        assert_eq!(get_last_list_message_id(&db, chat).await?, Some(99));
+        db.update_last_list_message_id(chat, MessageId(99)).await?;
+        assert_eq!(db.get_last_list_message_id(chat).await?, Some(99));
 
-        clear_last_list_message_id(&db, chat).await?;
-        assert!(get_last_list_message_id(&db, chat).await?.is_none());
+        db.clear_last_list_message_id(chat).await?;
+        assert!(db.get_last_list_message_id(chat).await?.is_none());
 
         Ok(())
     }

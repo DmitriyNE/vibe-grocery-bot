@@ -25,7 +25,7 @@ async fn insert_items_adds_and_sends() {
     assert_eq!(added, 1);
 
     let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM items")
-        .fetch_one(&db)
+        .fetch_one(&*db)
         .await
         .unwrap();
     assert_eq!(count.0, 1);
@@ -50,7 +50,7 @@ async fn insert_items_empty_sends_nothing() {
     assert_eq!(added, 0);
 
     let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM items")
-        .fetch_one(&db)
+        .fetch_one(&*db)
         .await
         .unwrap();
     assert_eq!(count.0, 0);
