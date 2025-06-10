@@ -1,6 +1,6 @@
+use crate::db::Database;
 use crate::utils::download_file;
 use anyhow::Result;
-use sqlx::{Pool, Sqlite};
 use teloxide::prelude::*;
 
 use crate::ai::vision::parse_photo_items;
@@ -12,7 +12,7 @@ use crate::ai::config::AiConfig;
 pub async fn add_items_from_photo(
     bot: Bot,
     msg: Message,
-    db: Pool<Sqlite>,
+    db: Database,
     ai_config: Option<AiConfig>,
 ) -> Result<()> {
     let Some(config) = ai_config else {

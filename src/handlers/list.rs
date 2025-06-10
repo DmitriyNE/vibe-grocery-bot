@@ -1,11 +1,11 @@
+use crate::db::Database;
 use anyhow::Result;
-use sqlx::{Pool, Sqlite};
 use teloxide::{
     prelude::*,
     types::{ChatId, InlineKeyboardButton, InlineKeyboardMarkup, MessageId},
 };
 
-use crate::db::*;
+use crate::db::Item;
 
 pub fn format_list(items: &[Item]) -> (String, InlineKeyboardMarkup) {
     let mut text = String::new();
@@ -43,13 +43,13 @@ pub fn format_plain_list(items: &[Item]) -> String {
     text
 }
 
-pub async fn send_list(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()> {
+pub async fn send_list(bot: Bot, chat_id: ChatId, db: &Database) -> Result<()> {
     tracing::debug!(chat_id = chat_id.0, "Sending list");
-    if let Some(message_id) = get_last_list_message_id(db, chat_id).await? {
+    if let Some(message_id) = db.get_last_list_message_id(chat_id).await? {
         let _ = bot.delete_message(chat_id, MessageId(message_id)).await;
     }
 
-    let items = list_items(db, chat_id).await?;
+    let items = db.list_items(chat_id).await?;
     tracing::trace!(
         chat_id = chat_id.0,
         items_count = items.len(),
@@ -63,7 +63,7 @@ pub async fn send_list(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<(
                 "Your shopping list is empty! Send any message to add an item.",
             )
             .await?;
-        update_last_list_message_id(db, chat_id, sent_msg.id).await?;
+        db.update_last_list_message_id(chat_id, sent_msg.id).await?;
         return Ok(());
     }
 
@@ -74,14 +74,14 @@ pub async fn send_list(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<(
         .reply_markup(keyboard)
         .await?;
 
-    update_last_list_message_id(db, chat_id, sent_msg.id).await?;
+    db.update_last_list_message_id(chat_id, sent_msg.id).await?;
 
     Ok(())
 }
 
-pub async fn share_list(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()> {
+pub async fn share_list(bot: Bot, chat_id: ChatId, db: &Database) -> Result<()> {
     tracing::debug!(chat_id = chat_id.0, "Sharing list");
-    let items = list_items(db, chat_id).await?;
+    let items = db.list_items(chat_id).await?;
     if items.is_empty() {
         bot.send_message(chat_id, "Your shopping list is empty!")
             .await?;
@@ -98,14 +98,14 @@ pub async fn update_list_message(
     bot: &Bot,
     chat_id: ChatId,
     message_id: MessageId,
-    db: &Pool<Sqlite>,
+    db: &Database,
 ) -> Result<()> {
     tracing::debug!(
         chat_id = chat_id.0,
         message_id = message_id.0,
         "Updating list message",
     );
-    let items = list_items(db, chat_id).await?;
+    let items = db.list_items(chat_id).await?;
     tracing::trace!(items_count = items.len(), "Fetched items for update");
 
     if items.is_empty() {
@@ -128,9 +128,9 @@ pub async fn update_list_message(
     Ok(())
 }
 
-pub async fn archive(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()> {
+pub async fn archive(bot: Bot, chat_id: ChatId, db: &Database) -> Result<()> {
     tracing::debug!(chat_id = chat_id.0, "Archiving list");
-    let last_message_id = match get_last_list_message_id(db, chat_id).await? {
+    let last_message_id = match db.get_last_list_message_id(chat_id).await? {
         Some(id) => id,
         None => {
             bot.send_message(chat_id, "There is no active list to archive.")
@@ -139,7 +139,7 @@ pub async fn archive(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()>
         }
     };
 
-    let items = list_items(db, chat_id).await?;
+    let items = db.list_items(chat_id).await?;
     if items.is_empty() {
         bot.send_message(chat_id, "There is no active list to archive.")
             .await?;
@@ -156,8 +156,8 @@ pub async fn archive(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()>
         ))
         .await;
 
-    delete_all_items(db, chat_id).await?;
-    clear_last_list_message_id(db, chat_id).await?;
+    db.delete_all_items(chat_id).await?;
+    db.clear_last_list_message_id(chat_id).await?;
 
     bot.send_message(chat_id, "List archived! Send a message to start a new one.")
         .await?;
@@ -165,18 +165,18 @@ pub async fn archive(bot: Bot, chat_id: ChatId, db: &Pool<Sqlite>) -> Result<()>
     Ok(())
 }
 
-pub async fn nuke_list(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Result<()> {
+pub async fn nuke_list(bot: Bot, msg: Message, db: &Database) -> Result<()> {
     tracing::debug!(chat_id = msg.chat.id.0, "Nuking list");
     let _ = bot.delete_message(msg.chat.id, msg.id).await;
 
-    if let Some(list_message_id) = get_last_list_message_id(db, msg.chat.id).await? {
+    if let Some(list_message_id) = db.get_last_list_message_id(msg.chat.id).await? {
         let _ = bot
             .delete_message(msg.chat.id, MessageId(list_message_id))
             .await;
     }
 
-    delete_all_items(db, msg.chat.id).await?;
-    clear_last_list_message_id(db, msg.chat.id).await?;
+    db.delete_all_items(msg.chat.id).await?;
+    db.clear_last_list_message_id(msg.chat.id).await?;
 
     let confirmation = bot
         .send_message(msg.chat.id, "The active list has been nuked.")
@@ -186,18 +186,13 @@ pub async fn nuke_list(bot: Bot, msg: Message, db: &Pool<Sqlite>) -> Result<()> 
     Ok(())
 }
 
-pub async fn insert_items<I>(
-    bot: Bot,
-    chat_id: ChatId,
-    db: &Pool<Sqlite>,
-    items: I,
-) -> Result<usize>
+pub async fn insert_items<I>(bot: Bot, chat_id: ChatId, db: &Database, items: I) -> Result<usize>
 where
     I: IntoIterator<Item = String>,
 {
     let mut added = 0usize;
     for item in items {
-        add_item(db, chat_id, &item).await?;
+        db.add_item(chat_id, &item).await?;
         added += 1;
     }
 
