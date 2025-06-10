@@ -48,6 +48,7 @@ pub async fn run() -> Result<()> {
         );
     }
     let ai_config = config.ai.clone();
+    let delete_after_timeout = config.delete_after_timeout;
 
     // --- SQLite Pool ---
     let db_url = db::prepare_sqlite_url(&config.db_url);
@@ -84,14 +85,17 @@ pub async fn run() -> Result<()> {
                      msg: Message,
                      cmd: Command,
                      db: db::Database,
-                     ai_config: Option<crate::ai::config::AiConfig>| async move {
+                     ai_config: Option<crate::ai::config::AiConfig>,
+                     delete_after_timeout: u64| async move {
                         match cmd {
                             Command::Start | Command::Help => help(bot, msg).await?,
                             Command::List => send_list(bot, msg.chat.id, &db).await?,
                             Command::Archive => archive(bot, msg.chat.id, &db).await?,
-                            Command::Delete => enter_delete_mode(bot, msg, &db).await?,
+                            Command::Delete => {
+                                enter_delete_mode(bot, msg, &db, delete_after_timeout).await?
+                            }
                             Command::Share => share_list(bot, msg.chat.id, &db).await?,
-                            Command::Nuke => nuke_list(bot, msg, &db).await?,
+                            Command::Nuke => nuke_list(bot, msg, &db, delete_after_timeout).await?,
                             Command::Parse => {
                                 add_items_from_parsed_text(bot, msg, db, ai_config).await?
                             }
@@ -105,7 +109,7 @@ pub async fn run() -> Result<()> {
 
     // --- Dispatcher ---
     Dispatcher::builder(bot, handler)
-        .dependencies(dptree::deps![db, ai_config])
+        .dependencies(dptree::deps![db, ai_config, delete_after_timeout])
         .enable_ctrlc_handler()
         .build()
         .dispatch()

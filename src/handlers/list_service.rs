@@ -144,7 +144,7 @@ impl<'a> ListService<'a> {
         Ok(())
     }
 
-    pub async fn nuke(&self, bot: Bot, msg: Message) -> Result<()> {
+    pub async fn nuke(&self, bot: Bot, msg: Message, delete_after_timeout: u64) -> Result<()> {
         if let Err(err) = bot.delete_message(msg.chat.id, msg.id).await {
             tracing::warn!(
                 error = %err,
@@ -173,7 +173,7 @@ impl<'a> ListService<'a> {
             bot.clone(),
             confirmation.chat.id,
             confirmation.id,
-            crate::utils::DELETE_AFTER_TIMEOUT,
+            delete_after_timeout,
         ));
         Ok(())
     }

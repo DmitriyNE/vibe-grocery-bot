@@ -84,7 +84,7 @@ async fn nuke_clears_data_and_sends_confirmation() {
     )
     .unwrap();
 
-    nuke_list(bot, msg, &db).await.unwrap();
+    nuke_list(bot, msg, &db, 5).await.unwrap();
 
     let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM items")
         .fetch_one(&*db)

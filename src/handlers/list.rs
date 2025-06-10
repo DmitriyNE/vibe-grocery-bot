@@ -74,9 +74,16 @@ pub async fn archive(bot: Bot, chat_id: ChatId, db: &Database) -> Result<()> {
     ListService::new(db).archive(bot, chat_id).await
 }
 
-pub async fn nuke_list(bot: Bot, msg: Message, db: &Database) -> Result<()> {
+pub async fn nuke_list(
+    bot: Bot,
+    msg: Message,
+    db: &Database,
+    delete_after_timeout: u64,
+) -> Result<()> {
     tracing::debug!(chat_id = msg.chat.id.0, "Nuking list");
-    ListService::new(db).nuke(bot, msg).await
+    ListService::new(db)
+        .nuke(bot, msg, delete_after_timeout)
+        .await
 }
 
 pub async fn insert_items<I>(bot: Bot, chat_id: ChatId, db: &Database, items: I) -> Result<usize>

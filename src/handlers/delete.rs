@@ -43,7 +43,12 @@ pub fn format_delete_list(
     (text, InlineKeyboardMarkup::new(keyboard_buttons))
 }
 
-pub async fn enter_delete_mode(bot: Bot, msg: Message, db: &Database) -> Result<()> {
+pub async fn enter_delete_mode(
+    bot: Bot,
+    msg: Message,
+    db: &Database,
+    delete_after_timeout: u64,
+) -> Result<()> {
     tracing::debug!(
         chat_id = msg.chat.id.0,
         user_id = msg.from.as_ref().map(|u| u.id.0),
@@ -66,7 +71,7 @@ pub async fn enter_delete_mode(bot: Bot, msg: Message, db: &Database) -> Result<
             bot.clone(),
             sent_msg.chat.id,
             sent_msg.id,
-            crate::utils::DELETE_AFTER_TIMEOUT,
+            delete_after_timeout,
         ));
         return Ok(());
     }
@@ -139,7 +144,7 @@ pub async fn enter_delete_mode(bot: Bot, msg: Message, db: &Database) -> Result<
                 bot.clone(),
                 warn.chat.id,
                 warn.id,
-                crate::utils::DELETE_AFTER_TIMEOUT,
+                delete_after_timeout,
             ));
         }
     }
