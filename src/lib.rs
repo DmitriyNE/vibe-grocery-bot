@@ -1,7 +1,8 @@
 use anyhow::Result;
-use teloxide::{prelude::*, utils::command::BotCommands};
+use teloxide::prelude::*;
 
 pub mod ai;
+mod commands;
 mod config;
 pub mod db;
 mod handlers;
@@ -14,6 +15,7 @@ pub mod tests;
 
 pub use ai::gpt::parse_items_gpt;
 pub use ai::stt::parse_items;
+pub use commands::Command;
 pub use config::Config;
 pub use db::Item;
 pub use handlers::{format_delete_list, format_list, format_plain_list, insert_items};
@@ -62,31 +64,7 @@ pub async fn run() -> Result<()> {
     sqlx::migrate!("./migrations").run(&*db).await?;
 
     // --- Command Enum ---
-    #[derive(BotCommands, Clone)]
-    #[command(
-        rename_rule = "lowercase",
-        description = "These commands are supported:"
-    )]
-    enum Command {
-        #[command(description = "display this text.")]
-        Start,
-        #[command(description = "display this text.")]
-        Help,
-        #[command(description = "show the current shopping list.")]
-        List,
-        #[command(description = "finalize and archive the current list, starting a new one.")]
-        Archive,
-        #[command(description = "show a temporary panel to delete items from the list.")]
-        Delete,
-        #[command(description = "send the list as plain text for copying.")]
-        Share,
-        #[command(description = "completely delete the current list.")]
-        Nuke,
-        #[command(description = "parse items from the given text using GPT.")]
-        Parse,
-        #[command(description = "show system information.")]
-        Info,
-    }
+    // defined in the commands module
 
     // --- Handler Setup ---
     let handler = dptree::entry()
