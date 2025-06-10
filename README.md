@@ -71,7 +71,7 @@ Before committing, run:
 ```bash
 cargo fmt --all -- --check
 cargo clippy --all-targets --all-features -- -D warnings
-cargo test --all --no-fail-fast
+cargo nextest run --all
 ```
 
 Have fun and vibe responsibly!
