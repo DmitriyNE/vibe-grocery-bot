@@ -6,6 +6,10 @@ use teloxide::{
 
 use super::list::{format_list, format_plain_list};
 use crate::db::Database;
+use crate::messages::{
+    ARCHIVED_LIST_HEADER, LIST_ARCHIVED, LIST_EMPTY, LIST_EMPTY_ADD_ITEM, LIST_NOW_EMPTY,
+    LIST_NUKED, NO_ACTIVE_LIST_TO_ARCHIVE,
+};
 
 pub struct ListService<'a> {
     db: &'a Database,
@@ -23,12 +27,7 @@ impl<'a> ListService<'a> {
 
         let items = self.db.list_items(chat_id).await?;
         if items.is_empty() {
-            let sent = bot
-                .send_message(
-                    chat_id,
-                    "Your shopping list is empty! Send any message to add an item.",
-                )
-                .await?;
+            let sent = bot.send_message(chat_id, LIST_EMPTY_ADD_ITEM).await?;
             self.db
                 .update_last_list_message_id(chat_id, sent.id)
                 .await?;
@@ -49,8 +48,7 @@ impl<'a> ListService<'a> {
     pub async fn share_list(&self, bot: Bot, chat_id: ChatId) -> Result<()> {
         let items = self.db.list_items(chat_id).await?;
         if items.is_empty() {
-            bot.send_message(chat_id, "Your shopping list is empty!")
-                .await?;
+            bot.send_message(chat_id, LIST_EMPTY).await?;
             return Ok(());
         }
         let text = format_plain_list(&items);
@@ -67,7 +65,7 @@ impl<'a> ListService<'a> {
         let items = self.db.list_items(chat_id).await?;
         if items.is_empty() {
             let _ = bot
-                .edit_message_text(chat_id, message_id, "List is now empty!")
+                .edit_message_text(chat_id, message_id, LIST_NOW_EMPTY)
                 .reply_markup(InlineKeyboardMarkup::new(
                     Vec::<Vec<InlineKeyboardButton>>::new(),
                 ))
@@ -87,21 +85,19 @@ impl<'a> ListService<'a> {
         let last_message_id = match self.db.get_last_list_message_id(chat_id).await? {
             Some(id) => id,
             None => {
-                bot.send_message(chat_id, "There is no active list to archive.")
-                    .await?;
+                bot.send_message(chat_id, NO_ACTIVE_LIST_TO_ARCHIVE).await?;
                 return Ok(());
             }
         };
 
         let items = self.db.list_items(chat_id).await?;
         if items.is_empty() {
-            bot.send_message(chat_id, "There is no active list to archive.")
-                .await?;
+            bot.send_message(chat_id, NO_ACTIVE_LIST_TO_ARCHIVE).await?;
             return Ok(());
         }
 
         let (final_text, _) = format_list(&items);
-        let archived_text = format!("--- Archived List ---\n{}", final_text);
+        let archived_text = format!("{ARCHIVED_LIST_HEADER}\n{}", final_text);
 
         let _ = bot
             .edit_message_text(chat_id, MessageId(last_message_id), archived_text)
@@ -113,8 +109,7 @@ impl<'a> ListService<'a> {
         self.db.delete_all_items(chat_id).await?;
         self.db.clear_last_list_message_id(chat_id).await?;
 
-        bot.send_message(chat_id, "List archived! Send a message to start a new one.")
-            .await?;
+        bot.send_message(chat_id, LIST_ARCHIVED).await?;
         Ok(())
     }
 
@@ -127,9 +122,7 @@ impl<'a> ListService<'a> {
         }
         self.db.delete_all_items(msg.chat.id).await?;
         self.db.clear_last_list_message_id(msg.chat.id).await?;
-        let confirmation = bot
-            .send_message(msg.chat.id, "The active list has been nuked.")
-            .await?;
+        let confirmation = bot.send_message(msg.chat.id, LIST_NUKED).await?;
         crate::delete_after(bot.clone(), confirmation.chat.id, confirmation.id, 5);
         Ok(())
     }

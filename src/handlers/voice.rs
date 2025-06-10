@@ -6,6 +6,7 @@ use teloxide::prelude::*;
 use crate::ai::config::AiConfig;
 use crate::ai::gpt::{interpret_voice_command, VoiceCommand};
 use crate::ai::stt::{parse_items, transcribe_audio, DEFAULT_PROMPT};
+use crate::messages::VOICE_REMOVED_PREFIX;
 use crate::text_utils::{capitalize_first, normalize_for_match};
 
 use crate::db::Item;
@@ -92,8 +93,7 @@ pub async fn add_items_from_voice(
                             msg.chat.id
                         );
                         let lines: Vec<String> = deleted.iter().map(|t| format!("• {t}")).collect();
-                        let msg_text =
-                            format!("🗑 Removed via voice request:\n{}", lines.join("\n"));
+                        let msg_text = format!("{VOICE_REMOVED_PREFIX}{}", lines.join("\n"));
                         bot.send_message(msg.chat.id, msg_text).await?;
                         send_list(bot.clone(), msg.chat.id, &db).await?;
                     }

@@ -7,6 +7,10 @@ use teloxide::{
 };
 
 use crate::db::Item;
+use crate::messages::{
+    delete_dm_text, delete_user_selecting_text, DEFAULT_CHAT_NAME, DELETE_DM_FAILED,
+    DELETE_DONE_LABEL, DELETE_SELECT_PROMPT, NO_ACTIVE_LIST_TO_EDIT,
+};
 
 use super::list::update_list_message;
 
@@ -14,7 +18,7 @@ pub fn format_delete_list(
     items: &[Item],
     selected: &HashSet<i64>,
 ) -> (String, InlineKeyboardMarkup) {
-    let text = "Select items to delete, then tap 'Done Deleting'.".to_string();
+    let text = DELETE_SELECT_PROMPT.to_string();
 
     let mut keyboard_buttons = Vec::new();
 
@@ -32,7 +36,7 @@ pub fn format_delete_list(
     }
 
     keyboard_buttons.push(vec![InlineKeyboardButton::callback(
-        "🗑️ Done Deleting",
+        DELETE_DONE_LABEL,
         "delete_done",
     )]);
 
@@ -49,7 +53,7 @@ pub async fn enter_delete_mode(bot: Bot, msg: Message, db: &Database) -> Result<
 
     if db.get_last_list_message_id(msg.chat.id).await?.is_none() {
         let sent_msg = bot
-            .send_message(msg.chat.id, "There is no active list to edit.")
+            .send_message(msg.chat.id, NO_ACTIVE_LIST_TO_EDIT)
             .await?;
         crate::delete_after(bot.clone(), sent_msg.chat.id, sent_msg.id, 5);
         return Ok(());
@@ -83,8 +87,8 @@ pub async fn enter_delete_mode(bot: Bot, msg: Message, db: &Database) -> Result<
         .chat
         .title()
         .map(ToString::to_string)
-        .unwrap_or_else(|| "your list".to_string());
-    let dm_text = format!("Deleting items from {}.\n\n{}", chat_name, base_text);
+        .unwrap_or_else(|| DEFAULT_CHAT_NAME.to_string());
+    let dm_text = delete_dm_text(&chat_name, &base_text);
 
     match bot
         .send_message(UserId(user.id.0), dm_text.clone())
@@ -96,10 +100,7 @@ pub async fn enter_delete_mode(bot: Bot, msg: Message, db: &Database) -> Result<
                 .await?;
             if !msg.chat.is_private() {
                 let info = bot
-                    .send_message(
-                        msg.chat.id,
-                        format!("{} is selecting items to delete...", user.first_name),
-                    )
+                    .send_message(msg.chat.id, delete_user_selecting_text(&user.first_name))
                     .await?;
                 db.set_delete_notice(user.id.0 as i64, msg.chat.id, info.id)
                     .await?;
@@ -107,12 +108,7 @@ pub async fn enter_delete_mode(bot: Bot, msg: Message, db: &Database) -> Result<
         }
         Err(err) => {
             tracing::warn!("failed to send DM: {}", err);
-            let warn = bot
-                .send_message(
-                    msg.chat.id,
-                    "Unable to send you a private delete panel. Have you started me in private?",
-                )
-                .await?;
+            let warn = bot.send_message(msg.chat.id, DELETE_DM_FAILED).await?;
             crate::delete_after(bot.clone(), warn.chat.id, warn.id, 5);
         }
     }

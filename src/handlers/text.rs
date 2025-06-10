@@ -5,26 +5,15 @@ use teloxide::prelude::*;
 use crate::ai::config::AiConfig;
 use crate::ai::gpt::parse_items_gpt;
 use crate::ai::stt::parse_items;
+use crate::messages::{GPT_PARSING_DISABLED, HELP_TEXT};
 use crate::text_utils::{capitalize_first, parse_item_line};
 
 use super::list::insert_items;
 
 pub async fn help(bot: Bot, msg: Message) -> Result<()> {
-    bot.send_message(
-        msg.chat.id,
-        "Send me any text to add it to your shopping list. Each line will be a new item.\n\
-             You can tap the checkbox button next to an item to mark it as bought.\n\n\
-             <b>Commands:</b>\n\
-             /list - Show the current shopping list.\n\
-             /archive - Finalize and archive the current list, starting a new one.\n\
-             /delete - Show a temporary panel to delete items from the list.\n\
-             /share - Send the list as plain text for copying.\n\
-             /nuke - Completely delete the current list.\n\
-             /parse - Parse this message into items via GPT.\n\
-             /info - Show system information.",
-    )
-    .parse_mode(teloxide::types::ParseMode::Html)
-    .await?;
+    bot.send_message(msg.chat.id, HELP_TEXT)
+        .parse_mode(teloxide::types::ParseMode::Html)
+        .await?;
     Ok(())
 }
 
@@ -47,8 +36,7 @@ pub async fn add_items_from_parsed_text(
     ai_config: Option<AiConfig>,
 ) -> Result<()> {
     let Some(config) = ai_config else {
-        bot.send_message(msg.chat.id, "GPT parsing is disabled.")
-            .await?;
+        bot.send_message(msg.chat.id, GPT_PARSING_DISABLED).await?;
         return Ok(());
     };
 
