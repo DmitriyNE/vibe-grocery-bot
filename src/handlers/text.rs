@@ -1,5 +1,5 @@
+use crate::db::Database;
 use anyhow::Result;
-use sqlx::{Pool, Sqlite};
 use teloxide::prelude::*;
 
 use crate::ai::config::AiConfig;
@@ -17,7 +17,7 @@ pub async fn help(bot: Bot, msg: Message) -> Result<()> {
     Ok(())
 }
 
-pub async fn add_items_from_text(bot: Bot, msg: Message, db: Pool<Sqlite>) -> Result<()> {
+pub async fn add_items_from_text(bot: Bot, msg: Message, db: Database) -> Result<()> {
     if let Some(text) = msg.text() {
         let items: Vec<String> = text.lines().filter_map(parse_item_line).collect();
 
@@ -32,7 +32,7 @@ pub async fn add_items_from_text(bot: Bot, msg: Message, db: Pool<Sqlite>) -> Re
 pub async fn add_items_from_parsed_text(
     bot: Bot,
     msg: Message,
-    db: Pool<Sqlite>,
+    db: Database,
     ai_config: Option<AiConfig>,
 ) -> Result<()> {
     let Some(config) = ai_config else {

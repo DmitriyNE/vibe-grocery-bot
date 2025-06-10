@@ -1,6 +1,7 @@
 pub mod delete;
 pub mod info;
 pub mod list;
+pub mod list_service;
 pub mod photo;
 pub mod text;
 pub mod voice;

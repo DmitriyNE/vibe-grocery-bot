@@ -24,20 +24,8 @@ pub async fn parse_photo_items_inner(
 ) -> Result<Vec<String>> {
     let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
     let data_url = format!("data:image/png;base64,{}", encoded);
-    let body = serde_json::json!({
-        "model": model,
-        "response_format": { "type": "json_object" },
-        "messages": [
-            {
-                "role": "system",
-                "content": "Extract the items shown in the photo. Respond with a JSON object like {\"items\": [\"apples\"]}.",
-            },
-            {
-                "role": "user",
-                "content": [ { "type": "image_url", "image_url": { "url": data_url } } ],
-            }
-        ]
-    });
+    let prompt = "Extract the items shown in the photo. Respond with a JSON object like {\"items\": [\"apples\"]}.";
+    let body = crate::ai::common::build_image_chat_body(model, prompt, &data_url);
 
     request_items(api_key, &body, url).await
 }
