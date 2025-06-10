@@ -62,7 +62,12 @@ pub async fn enter_delete_mode(bot: Bot, msg: Message, db: &Database) -> Result<
         let sent_msg = bot
             .send_message(msg.chat.id, NO_ACTIVE_LIST_TO_EDIT)
             .await?;
-        crate::delete_after(bot.clone(), sent_msg.chat.id, sent_msg.id, 5);
+        crate::delete_after(
+            bot.clone(),
+            sent_msg.chat.id,
+            sent_msg.id,
+            crate::utils::DELETE_AFTER_TIMEOUT,
+        );
         return Ok(());
     }
 
@@ -130,7 +135,12 @@ pub async fn enter_delete_mode(bot: Bot, msg: Message, db: &Database) -> Result<
         Err(err) => {
             tracing::warn!("failed to send DM: {}", err);
             let warn = bot.send_message(msg.chat.id, DELETE_DM_FAILED).await?;
-            crate::delete_after(bot.clone(), warn.chat.id, warn.id, 5);
+            crate::delete_after(
+                bot.clone(),
+                warn.chat.id,
+                warn.id,
+                crate::utils::DELETE_AFTER_TIMEOUT,
+            );
         }
     }
 
