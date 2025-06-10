@@ -1,5 +1,5 @@
 use proptest::prelude::*;
-use shopbot::{parse_item_line, parse_items};
+use shopbot::{normalize_for_match, parse_item_line, parse_items};
 
 // Property: parse_item_line should never panic for arbitrary input
 proptest! {
@@ -30,5 +30,16 @@ proptest! {
     fn prop_parse_items_separators((expected, text) in joined_items_strategy()) {
         let parsed = parse_items(&text);
         prop_assert_eq!(parsed, expected);
+    }
+}
+
+proptest! {
+    #[test]
+    fn prop_normalize_for_match_lowercase_no_leading(s in "(?s).*") {
+        let result = normalize_for_match(&s);
+        let first = result.chars().next();
+        prop_assert!(first.is_none_or(|c| !(c.is_ascii_digit() || c.is_whitespace())));
+        let lowered = result.to_lowercase();
+        prop_assert_eq!(result, lowered);
     }
 }
