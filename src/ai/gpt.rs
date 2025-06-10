@@ -25,17 +25,8 @@ pub async fn parse_items_gpt_inner(
     text: &str,
     url: &str,
 ) -> Result<Vec<String>> {
-    let body = serde_json::json!({
-        "model": model,
-        "response_format": { "type": "json_object" },
-        "messages": [
-            {
-                "role": "system",
-                "content": "Extract the items from the user's text. Use the nominative form for nouns when it does not change the meaning. Convert number words to digits so 'три ананаса' becomes '3 ананаса'. Respond with a JSON object like {\"items\": [\"1 milk\"]}",
-            },
-            { "role": "user", "content": text },
-        ]
-    });
+    let prompt = "Extract the items from the user's text. Use the nominative form for nouns when it does not change the meaning. Convert number words to digits so 'три ананаса' becomes '3 ананаса'. Respond with a JSON object like {\"items\": [\"1 milk\"]}";
+    let body = crate::ai::common::build_text_chat_body(model, prompt, text);
 
     request_items(api_key, &body, url).await
 }
@@ -82,14 +73,7 @@ pub async fn interpret_voice_command_inner(
         "You manage a list of items. {list_text} The list as JSON is {list_json}. Decide whether the user's request adds items or removes items from the list. Return a JSON object like {{\"add\":[...]}} or {{\"delete\":[...]}}. For deletions, include each item exactly as it appears in the list, including any leading quantities. If unsure, treat it as an addition request. Use nominative forms for item names when possible and convert number words to digits."
     );
 
-    let body = serde_json::json!({
-        "model": model,
-        "response_format": { "type": "json_object" },
-        "messages": [
-            { "role": "system", "content": prompt },
-            { "role": "user", "content": text },
-        ]
-    });
+    let body = crate::ai::common::build_text_chat_body(model, &prompt, text);
 
     #[derive(serde::Deserialize)]
     struct ChatChoice {

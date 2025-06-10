@@ -24,6 +24,41 @@ struct ItemsJson {
 
 pub const OPENAI_CHAT_URL: &str = "https://api.openai.com/v1/chat/completions";
 
+/// Build a chat completion request body for text input.
+pub fn build_text_chat_body(
+    model: &str,
+    system_prompt: &str,
+    user_text: &str,
+) -> serde_json::Value {
+    serde_json::json!({
+        "model": model,
+        "response_format": { "type": "json_object" },
+        "messages": [
+            { "role": "system", "content": system_prompt },
+            { "role": "user", "content": user_text },
+        ]
+    })
+}
+
+/// Build a chat completion request body for an image input.
+pub fn build_image_chat_body(
+    model: &str,
+    system_prompt: &str,
+    image_url: &str,
+) -> serde_json::Value {
+    serde_json::json!({
+        "model": model,
+        "response_format": { "type": "json_object" },
+        "messages": [
+            { "role": "system", "content": system_prompt },
+            {
+                "role": "user",
+                "content": [ { "type": "image_url", "image_url": { "url": image_url } } ],
+            }
+        ]
+    })
+}
+
 #[instrument(level = "trace", skip(api_key, builder))]
 pub async fn send_openai_request(
     api_key: &str,
