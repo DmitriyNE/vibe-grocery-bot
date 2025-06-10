@@ -148,7 +148,7 @@ pub async fn callback_handler(bot: Bot, q: CallbackQuery, db: Database) -> Resul
                         return Ok(());
                     }
                     for id in &session.selected {
-                        db.delete_item(*id).await?;
+                        db.delete_item(session.chat_id, *id).await?;
                     }
 
                     if let Some(main_list_id) = db.get_last_list_message_id(session.chat_id).await?
@@ -208,7 +208,7 @@ pub async fn callback_handler(bot: Bot, q: CallbackQuery, db: Database) -> Resul
                 }
             }
         } else if let Ok(id) = data.parse::<i64>() {
-            db.toggle_item(id).await?;
+            db.toggle_item(msg.chat().id, id).await?;
             update_list_message(&bot, msg.chat().id, msg.id(), &db).await?;
         }
     }

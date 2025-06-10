@@ -15,11 +15,11 @@ async fn basic_item_flow() -> Result<()> {
     assert_eq!(items[0].text, "Apples");
     assert!(!items[0].done);
 
-    db.toggle_item(items[0].id).await?;
+    db.toggle_item(chat, items[0].id).await?;
     items = db.list_items(chat).await?;
     assert!(items[0].done);
 
-    db.delete_item(items[1].id).await?;
+    db.delete_item(chat, items[1].id).await?;
     items = db.list_items(chat).await?;
     assert_eq!(items.len(), 1);
 

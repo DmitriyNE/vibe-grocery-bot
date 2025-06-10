@@ -36,7 +36,7 @@ RUN cargo build --release && strip target/release/shopbot
 # This is the final, small image that will be deployed.
 # It only contains the compiled binary and necessary runtime libraries.
 FROM debian:bookworm-slim AS runtime
-LABEL org.opencontainers.image.source="https://github.com/your/repo"
+LABEL org.opencontainers.image.source="https://github.com/DmitriyNE/vibe-grocery-bot"
 
 # Install runtime dependencies (ca-certificates for HTTPS) and gosu for user switching.
 # gosu is a lightweight tool for switching users, a common alternative to sudo.
