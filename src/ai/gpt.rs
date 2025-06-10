@@ -49,8 +49,10 @@ pub async fn interpret_voice_command(
     model: &str,
     text: &str,
     list: &[String],
+    url: Option<&str>,
 ) -> Result<VoiceCommand> {
-    interpret_voice_command_inner(api_key, model, text, list, OPENAI_CHAT_URL).await
+    let url = url.unwrap_or(OPENAI_CHAT_URL);
+    interpret_voice_command_inner(api_key, model, text, list, url).await
 }
 
 #[cfg_attr(not(test), allow(dead_code))]

@@ -59,7 +59,7 @@ pub async fn add_items_from_voice(
         &config.api_key,
         Some(DEFAULT_PROMPT),
         &audio,
-        None,
+        config.openai_stt_url.as_deref(),
     )
     .await
     {
@@ -70,8 +70,14 @@ pub async fn add_items_from_voice(
             }
             let mut current = db.list_items(msg.chat.id).await?;
             let list_texts: Vec<String> = current.iter().map(|i| i.text.clone()).collect();
-            match interpret_voice_command(&config.api_key, &config.gpt_model, &text, &list_texts)
-                .await
+            match interpret_voice_command(
+                &config.api_key,
+                &config.gpt_model,
+                &text,
+                &list_texts,
+                config.openai_chat_url.as_deref(),
+            )
+            .await
             {
                 Ok(VoiceCommand::Add(items)) => {
                     let items: Vec<String> =
