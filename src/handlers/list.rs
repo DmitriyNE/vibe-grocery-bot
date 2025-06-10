@@ -1,11 +1,11 @@
-use crate::db::Database;
+use crate::db::{Database, Item};
 use anyhow::Result;
 use teloxide::{
     prelude::*,
-    types::{ChatId, InlineKeyboardButton, InlineKeyboardMarkup, MessageId},
+    types::{ChatId, InlineKeyboardButton, InlineKeyboardMarkup, Message, MessageId},
 };
 
-use crate::db::Item;
+use super::list_service::ListService;
 
 pub fn format_list(items: &[Item]) -> (String, InlineKeyboardMarkup) {
     let mut text = String::new();
@@ -45,53 +45,12 @@ pub fn format_plain_list(items: &[Item]) -> String {
 
 pub async fn send_list(bot: Bot, chat_id: ChatId, db: &Database) -> Result<()> {
     tracing::debug!(chat_id = chat_id.0, "Sending list");
-    if let Some(message_id) = db.get_last_list_message_id(chat_id).await? {
-        let _ = bot.delete_message(chat_id, MessageId(message_id)).await;
-    }
-
-    let items = db.list_items(chat_id).await?;
-    tracing::trace!(
-        chat_id = chat_id.0,
-        items_count = items.len(),
-        "Fetched items for list",
-    );
-
-    if items.is_empty() {
-        let sent_msg = bot
-            .send_message(
-                chat_id,
-                "Your shopping list is empty! Send any message to add an item.",
-            )
-            .await?;
-        db.update_last_list_message_id(chat_id, sent_msg.id).await?;
-        return Ok(());
-    }
-
-    let (text, keyboard) = format_list(&items);
-
-    let sent_msg = bot
-        .send_message(chat_id, text)
-        .reply_markup(keyboard)
-        .await?;
-
-    db.update_last_list_message_id(chat_id, sent_msg.id).await?;
-
-    Ok(())
+    ListService::new(db).send_list(bot, chat_id).await
 }
 
 pub async fn share_list(bot: Bot, chat_id: ChatId, db: &Database) -> Result<()> {
     tracing::debug!(chat_id = chat_id.0, "Sharing list");
-    let items = db.list_items(chat_id).await?;
-    if items.is_empty() {
-        bot.send_message(chat_id, "Your shopping list is empty!")
-            .await?;
-        return Ok(());
-    }
-
-    let text = format_plain_list(&items);
-    bot.send_message(chat_id, text).await?;
-
-    Ok(())
+    ListService::new(db).share_list(bot, chat_id).await
 }
 
 pub async fn update_list_message(
@@ -105,85 +64,19 @@ pub async fn update_list_message(
         message_id = message_id.0,
         "Updating list message",
     );
-    let items = db.list_items(chat_id).await?;
-    tracing::trace!(items_count = items.len(), "Fetched items for update");
-
-    if items.is_empty() {
-        let _ = bot
-            .edit_message_text(chat_id, message_id, "List is now empty!")
-            .reply_markup(InlineKeyboardMarkup::new(
-                Vec::<Vec<InlineKeyboardButton>>::new(),
-            ))
-            .await;
-        return Ok(());
-    }
-
-    let (text, keyboard) = format_list(&items);
-
-    let _ = bot
-        .edit_message_text(chat_id, message_id, text)
-        .reply_markup(keyboard)
-        .await;
-
-    Ok(())
+    ListService::new(db)
+        .update_message(bot, chat_id, message_id)
+        .await
 }
 
 pub async fn archive(bot: Bot, chat_id: ChatId, db: &Database) -> Result<()> {
     tracing::debug!(chat_id = chat_id.0, "Archiving list");
-    let last_message_id = match db.get_last_list_message_id(chat_id).await? {
-        Some(id) => id,
-        None => {
-            bot.send_message(chat_id, "There is no active list to archive.")
-                .await?;
-            return Ok(());
-        }
-    };
-
-    let items = db.list_items(chat_id).await?;
-    if items.is_empty() {
-        bot.send_message(chat_id, "There is no active list to archive.")
-            .await?;
-        return Ok(());
-    }
-
-    let (final_text, _) = format_list(&items);
-    let archived_text = format!("--- Archived List ---\n{}", final_text);
-
-    let _ = bot
-        .edit_message_text(chat_id, MessageId(last_message_id), archived_text)
-        .reply_markup(InlineKeyboardMarkup::new(
-            Vec::<Vec<InlineKeyboardButton>>::new(),
-        ))
-        .await;
-
-    db.delete_all_items(chat_id).await?;
-    db.clear_last_list_message_id(chat_id).await?;
-
-    bot.send_message(chat_id, "List archived! Send a message to start a new one.")
-        .await?;
-
-    Ok(())
+    ListService::new(db).archive(bot, chat_id).await
 }
 
 pub async fn nuke_list(bot: Bot, msg: Message, db: &Database) -> Result<()> {
     tracing::debug!(chat_id = msg.chat.id.0, "Nuking list");
-    let _ = bot.delete_message(msg.chat.id, msg.id).await;
-
-    if let Some(list_message_id) = db.get_last_list_message_id(msg.chat.id).await? {
-        let _ = bot
-            .delete_message(msg.chat.id, MessageId(list_message_id))
-            .await;
-    }
-
-    db.delete_all_items(msg.chat.id).await?;
-    db.clear_last_list_message_id(msg.chat.id).await?;
-
-    let confirmation = bot
-        .send_message(msg.chat.id, "The active list has been nuked.")
-        .await?;
-    crate::delete_after(bot.clone(), confirmation.chat.id, confirmation.id, 5);
-
-    Ok(())
+    ListService::new(db).nuke(bot, msg).await
 }
 
 pub async fn insert_items<I>(bot: Bot, chat_id: ChatId, db: &Database, items: I) -> Result<usize>
