@@ -127,6 +127,7 @@ pub async fn interpret_voice_command_inner(
     }
 }
 
+#[cfg(test)]
 #[instrument(level = "trace", skip(api_key))]
 pub async fn interpret_voice_command_test(
     api_key: &str,
@@ -137,3 +138,8 @@ pub async fn interpret_voice_command_test(
 ) -> Result<VoiceCommand> {
     interpret_voice_command_inner(api_key, model, text, list, url).await
 }
+
+// Re-export the inner implementation so integration tests can still call
+// `interpret_voice_command_test` even though the real helper is gated off.
+#[cfg(not(test))]
+pub use interpret_voice_command_inner as interpret_voice_command_test;
