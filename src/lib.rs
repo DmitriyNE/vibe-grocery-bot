@@ -1,11 +1,11 @@
 use anyhow::Result;
-use sqlx::{Pool, Sqlite};
 use teloxide::{prelude::*, utils::command::BotCommands};
 
 pub mod ai;
 mod config;
 pub mod db;
 mod handlers;
+mod messages;
 mod system_info;
 mod text_utils;
 mod utils;
@@ -17,6 +17,7 @@ pub use ai::stt::parse_items;
 pub use config::Config;
 pub use db::Item;
 pub use handlers::{format_delete_list, format_list, format_plain_list, insert_items};
+pub use messages::*;
 pub use system_info::get_system_info;
 pub use text_utils::{capitalize_first, normalize_for_match, parse_item_line};
 pub use utils::delete_after;
@@ -53,11 +54,12 @@ pub async fn run() -> Result<()> {
 
     tracing::info!("Connecting to database at: {}", &db_url);
 
-    let db = db::connect_db(&db_url).await?;
+    let pool = db::connect_db(&db_url).await?;
+    let db = db::Database::new(pool);
 
     tracing::info!("Database connection successful.");
 
-    sqlx::migrate!("./migrations").run(&db).await?;
+    sqlx::migrate!("./migrations").run(&*db).await?;
 
     // --- Command Enum ---
     #[derive(BotCommands, Clone)]
@@ -105,7 +107,7 @@ pub async fn run() -> Result<()> {
                     |bot: Bot,
                      msg: Message,
                      cmd: Command,
-                     db: Pool<Sqlite>,
+                     db: db::Database,
                      ai_config: Option<crate::ai::config::AiConfig>| async move {
                         match cmd {
                             Command::Start | Command::Help => help(bot, msg).await?,

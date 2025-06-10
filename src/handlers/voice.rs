@@ -1,20 +1,18 @@
+use crate::db::Database;
 use crate::utils::download_file;
 use anyhow::Result;
-use sqlx::{Pool, Sqlite};
 use teloxide::prelude::*;
 
 use crate::ai::config::AiConfig;
 use crate::ai::gpt::{interpret_voice_command, VoiceCommand};
 use crate::ai::stt::{parse_items, transcribe_audio, DEFAULT_PROMPT};
-#[cfg(test)]
-use crate::db::add_item;
-use crate::db::{delete_items, list_items};
+use crate::messages::VOICE_REMOVED_PREFIX;
 use crate::text_utils::{capitalize_first, normalize_for_match};
 
 use crate::db::Item;
 
 pub async fn delete_matching_items(
-    db: &Pool<Sqlite>,
+    db: &Database,
     current: &mut Vec<Item>,
     items: &[String],
 ) -> Result<Vec<String>> {
@@ -31,7 +29,7 @@ pub async fn delete_matching_items(
             deleted.push(found.text);
         }
     }
-    delete_items(db, &ids).await?;
+    db.delete_items(&ids).await?;
     Ok(deleted)
 }
 
@@ -40,7 +38,7 @@ use super::list::{insert_items, send_list};
 pub async fn add_items_from_voice(
     bot: Bot,
     msg: Message,
-    db: Pool<Sqlite>,
+    db: Database,
     ai_config: Option<AiConfig>,
 ) -> Result<()> {
     let Some(config) = ai_config else {
@@ -69,7 +67,7 @@ pub async fn add_items_from_voice(
                 tracing::debug!("voice transcription empty; ignoring");
                 return Ok(());
             }
-            let mut current = list_items(&db, msg.chat.id).await?;
+            let mut current = db.list_items(msg.chat.id).await?;
             let list_texts: Vec<String> = current.iter().map(|i| i.text.clone()).collect();
             match interpret_voice_command(&config.api_key, &config.gpt_model, &text, &list_texts)
                 .await
@@ -95,8 +93,7 @@ pub async fn add_items_from_voice(
                             msg.chat.id
                         );
                         let lines: Vec<String> = deleted.iter().map(|t| format!("• {t}")).collect();
-                        let msg_text =
-                            format!("🗑 Removed via voice request:\n{}", lines.join("\n"));
+                        let msg_text = format!("{VOICE_REMOVED_PREFIX}{}", lines.join("\n"));
                         bot.send_message(msg.chat.id, msg_text).await?;
                         send_list(bot.clone(), msg.chat.id, &db).await?;
                     }
@@ -136,10 +133,10 @@ mod tests {
         let db = init_test_db().await;
         let chat = ChatId(1);
         for _ in 0..3 {
-            add_item(&db, chat, "Item").await.unwrap();
+            db.add_item(chat, "Item").await.unwrap();
         }
 
-        let mut current = list_items(&db, chat).await.unwrap();
+        let mut current = db.list_items(chat).await.unwrap();
         let deleted = delete_matching_items(
             &db,
             &mut current,
@@ -149,7 +146,7 @@ mod tests {
         .unwrap();
         assert_eq!(deleted.len(), 3);
         assert!(current.is_empty());
-        let remaining = list_items(&db, chat).await.unwrap();
+        let remaining = db.list_items(chat).await.unwrap();
         assert!(remaining.is_empty());
     }
 
@@ -157,11 +154,11 @@ mod tests {
     async fn delete_matching_partial() {
         let db = init_test_db().await;
         let chat = ChatId(1);
-        add_item(&db, chat, "Apple").await.unwrap();
-        add_item(&db, chat, "Banana").await.unwrap();
-        add_item(&db, chat, "Carrot").await.unwrap();
+        db.add_item(chat, "Apple").await.unwrap();
+        db.add_item(chat, "Banana").await.unwrap();
+        db.add_item(chat, "Carrot").await.unwrap();
 
-        let mut current = list_items(&db, chat).await.unwrap();
+        let mut current = db.list_items(chat).await.unwrap();
         let deleted = delete_matching_items(
             &db,
             &mut current,
@@ -174,7 +171,7 @@ mod tests {
         assert_eq!(current.len(), 1);
         assert_eq!(current[0].text, "Apple");
 
-        let remaining = list_items(&db, chat).await.unwrap();
+        let remaining = db.list_items(chat).await.unwrap();
         assert_eq!(remaining.len(), 1);
         assert_eq!(remaining[0].text, "Apple");
     }
