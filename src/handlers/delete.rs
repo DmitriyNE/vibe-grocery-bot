@@ -49,7 +49,14 @@ pub async fn enter_delete_mode(bot: Bot, msg: Message, db: &Database) -> Result<
         user_id = msg.from.as_ref().map(|u| u.id.0),
         "Entering delete mode",
     );
-    let _ = bot.delete_message(msg.chat.id, msg.id).await;
+    if let Err(err) = bot.delete_message(msg.chat.id, msg.id).await {
+        tracing::warn!(
+            error = %err,
+            chat_id = msg.chat.id.0,
+            message_id = msg.id.0,
+            "Failed to delete message",
+        );
+    }
 
     if db.get_last_list_message_id(msg.chat.id).await?.is_none() {
         let sent_msg = bot
@@ -66,10 +73,24 @@ pub async fn enter_delete_mode(bot: Bot, msg: Message, db: &Database) -> Result<
 
     if let Some(prev) = db.get_delete_session(user.id.0 as i64).await? {
         if let Some((c, m)) = prev.notice {
-            let _ = bot.delete_message(c, m).await;
+            if let Err(err) = bot.delete_message(c, m).await {
+                tracing::warn!(
+                    error = %err,
+                    chat_id = c.0,
+                    message_id = m.0,
+                    "Failed to delete message",
+                );
+            }
         }
         if let Some(dm) = prev.dm_message_id {
-            let _ = bot.delete_message(ChatId(user.id.0 as i64), dm).await;
+            if let Err(err) = bot.delete_message(ChatId(user.id.0 as i64), dm).await {
+                tracing::warn!(
+                    error = %err,
+                    chat_id = user.id.0,
+                    message_id = dm.0,
+                    "Failed to delete message",
+                );
+            }
         }
     }
 
@@ -137,13 +158,27 @@ pub async fn callback_handler(bot: Bot, q: CallbackQuery, db: Database) -> Resul
                     }
 
                     if let Some((chat_id, notice_id)) = session.notice {
-                        let _ = bot.delete_message(chat_id, notice_id).await;
+                        if let Err(err) = bot.delete_message(chat_id, notice_id).await {
+                            tracing::warn!(
+                                error = %err,
+                                chat_id = chat_id.0,
+                                message_id = notice_id.0,
+                                "Failed to delete message",
+                            );
+                        }
                     }
 
                     db.clear_delete_session(user_id).await?;
                 }
 
-                let _ = bot.delete_message(msg.chat().id, msg.id()).await;
+                if let Err(err) = bot.delete_message(msg.chat().id, msg.id()).await {
+                    tracing::warn!(
+                        error = %err,
+                        chat_id = msg.chat().id.0,
+                        message_id = msg.id().0,
+                        "Failed to delete message",
+                    );
+                }
             } else if let Ok(id) = id_str.parse::<i64>() {
                 if let Some(mut session) = db.get_delete_session(user_id).await? {
                     if session.dm_message_id.map(|m| m.0) != Some(msg.id().0) {
@@ -158,10 +193,18 @@ pub async fn callback_handler(bot: Bot, q: CallbackQuery, db: Database) -> Resul
                         .await?;
                     let items = db.list_items(session.chat_id).await?;
                     let (text, keyboard) = format_delete_list(&items, &session.selected);
-                    let _ = bot
+                    if let Err(err) = bot
                         .edit_message_text(msg.chat().id, msg.id(), text)
                         .reply_markup(keyboard)
-                        .await;
+                        .await
+                    {
+                        tracing::warn!(
+                            error = %err,
+                            chat_id = msg.chat().id.0,
+                            message_id = msg.id().0,
+                            "Failed to edit message",
+                        );
+                    }
                 }
             }
         } else if let Ok(id) = data.parse::<i64>() {
