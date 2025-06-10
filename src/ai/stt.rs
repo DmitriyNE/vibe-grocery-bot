@@ -39,7 +39,10 @@ async fn transcribe_audio_inner(
     let builder = client.post(url).multipart(form);
     let resp = crate::ai::common::send_openai_request(api_key, builder).await?;
 
-    let data: TranscriptionResponse = resp.json().await?;
+    let raw = resp.text().await?;
+    let snippet: String = raw.chars().take(200).collect();
+    debug!(snippet = %snippet, "transcription response body");
+    let data: TranscriptionResponse = serde_json::from_str(&raw)?;
     trace!(transcription = %data.text, "transcription successful");
     Ok(data.text)
 }

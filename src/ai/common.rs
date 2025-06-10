@@ -64,11 +64,19 @@ pub async fn send_openai_request(
     api_key: &str,
     builder: reqwest::RequestBuilder,
 ) -> Result<reqwest::Response> {
+    let url = builder
+        .try_clone()
+        .and_then(|b| b.build().ok())
+        .map(|req| req.url().clone());
+
     let resp = builder.bearer_auth(api_key).send().await?;
+    debug!(url = %url.as_ref().map(|u| u.as_str()).unwrap_or(""), status = %resp.status(), "OpenAI request completed");
 
     if !resp.status().is_success() {
         let status = resp.status();
         let err_text = resp.text().await.unwrap_or_default();
+        let snippet: String = err_text.chars().take(200).collect();
+        debug!(url = %url.as_ref().map(|u| u.as_str()).unwrap_or(""), %status, snippet = %snippet, "error body");
         warn!(%status, "OpenAI API error");
         return Err(anyhow!("OpenAI API error {status}: {err_text}"));
     }
@@ -89,6 +97,8 @@ pub async fn request_items(
     let resp = send_openai_request(api_key, builder).await?;
 
     let raw = resp.text().await?;
+    let snippet: String = raw.chars().take(200).collect();
+    debug!(snippet = %snippet, "chat response body");
     trace!(raw = %raw, "chat response");
     let chat: ChatResponse = serde_json::from_str(&raw)?;
     let content = chat
