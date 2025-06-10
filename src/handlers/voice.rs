@@ -13,6 +13,7 @@ use crate::db::Item;
 
 pub async fn delete_matching_items(
     db: &Database,
+    chat_id: ChatId,
     current: &mut Vec<Item>,
     items: &[String],
 ) -> Result<Vec<String>> {
@@ -29,7 +30,7 @@ pub async fn delete_matching_items(
             deleted.push(found.text);
         }
     }
-    db.delete_items(&ids).await?;
+    db.delete_items(chat_id, &ids).await?;
     Ok(deleted)
 }
 
@@ -85,7 +86,8 @@ pub async fn add_items_from_voice(
                     }
                 }
                 Ok(VoiceCommand::Delete(items)) => {
-                    let deleted = delete_matching_items(&db, &mut current, &items).await?;
+                    let deleted =
+                        delete_matching_items(&db, msg.chat.id, &mut current, &items).await?;
                     if !deleted.is_empty() {
                         tracing::info!(
                             "Deleted {} item(s) via voice for chat {}",
@@ -139,6 +141,7 @@ mod tests {
         let mut current = db.list_items(chat).await.unwrap();
         let deleted = delete_matching_items(
             &db,
+            chat,
             &mut current,
             &["Item".to_string(), "Item".to_string(), "Item".to_string()],
         )
@@ -161,6 +164,7 @@ mod tests {
         let mut current = db.list_items(chat).await.unwrap();
         let deleted = delete_matching_items(
             &db,
+            chat,
             &mut current,
             &["Banana".to_string(), "Carrot".to_string()],
         )

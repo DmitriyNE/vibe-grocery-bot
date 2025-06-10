@@ -29,19 +29,21 @@ impl Database {
             .map_err(Into::into)
     }
 
-    pub async fn toggle_item(&self, id: i64) -> Result<()> {
-        tracing::trace!(item_id = id, "Toggling item");
-        sqlx::query("UPDATE items SET done = NOT done WHERE id = ?")
+    pub async fn toggle_item(&self, chat_id: ChatId, id: i64) -> Result<()> {
+        tracing::trace!(chat_id = chat_id.0, item_id = id, "Toggling item");
+        sqlx::query("UPDATE items SET done = NOT done WHERE id = ? AND chat_id = ?")
             .bind(id)
+            .bind(chat_id.0)
             .execute(self.pool())
             .await?;
         Ok(())
     }
 
-    pub async fn delete_item(&self, id: i64) -> Result<()> {
-        tracing::trace!(item_id = id, "Deleting item");
-        sqlx::query("DELETE FROM items WHERE id = ?")
+    pub async fn delete_item(&self, chat_id: ChatId, id: i64) -> Result<()> {
+        tracing::trace!(chat_id = chat_id.0, item_id = id, "Deleting item");
+        sqlx::query("DELETE FROM items WHERE id = ? AND chat_id = ?")
             .bind(id)
+            .bind(chat_id.0)
             .execute(self.pool())
             .await?;
         Ok(())
@@ -56,19 +58,20 @@ impl Database {
         Ok(())
     }
 
-    pub async fn delete_items(&self, ids: &[i64]) -> Result<()> {
-        tracing::trace!(?ids, "Deleting multiple items");
+    pub async fn delete_items(&self, chat_id: ChatId, ids: &[i64]) -> Result<()> {
+        tracing::trace!(chat_id = chat_id.0, ?ids, "Deleting multiple items");
         if ids.is_empty() {
             return Ok(());
         }
 
-        let mut builder = sqlx::QueryBuilder::new("DELETE FROM items WHERE id IN (");
-        let mut separated = builder.separated(", ");
+        let mut sql = String::from("DELETE FROM items WHERE chat_id = ? AND id IN (");
+        sql.push_str(&vec!["?"; ids.len()].join(", "));
+        sql.push(')');
+        let mut query = sqlx::query(&sql).bind(chat_id.0);
         for id in ids {
-            separated.push_bind(id);
+            query = query.bind(id);
         }
-        separated.push_unseparated(")");
-        builder.build().execute(self.pool()).await?;
+        query.execute(self.pool()).await?;
         Ok(())
     }
 }
