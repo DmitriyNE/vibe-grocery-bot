@@ -13,7 +13,7 @@ pub struct Config {
 impl Config {
     pub fn from_env() -> Self {
         dotenvy::dotenv().ok();
-        let db_url = env::var("DB_URL").unwrap_or_else(|_| "sqlite:shopping.db".to_string());
+        let db_url = env::var("DB_URL").unwrap_or_else(|_| "sqlite:items.db".to_string());
         let db_pool_size = env::var("DB_POOL_SIZE")
             .ok()
             .and_then(|s| s.parse::<u32>().ok())
