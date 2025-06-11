@@ -77,20 +77,6 @@ pub async fn interpret_voice_command_inner(
 
     let body = crate::ai::common::build_text_chat_body(model, &prompt, text);
 
-    #[derive(serde::Deserialize)]
-    struct ChatChoice {
-        message: ChatMessage,
-    }
-    #[derive(serde::Deserialize)]
-    struct ChatMessage {
-        content: String,
-    }
-    #[derive(serde::Deserialize)]
-    struct ChatResponse {
-        choices: Vec<ChatChoice>,
-    }
-
-    use anyhow::{anyhow, Result};
     use tracing::{debug, trace};
 
     debug!(url, "sending chat completion request");
@@ -103,15 +89,7 @@ pub async fn interpret_voice_command_inner(
     let snippet: String = raw.chars().take(200).collect();
     debug!(snippet = %snippet, "chat response body");
     trace!(raw = %raw, "chat response");
-    let chat: ChatResponse = serde_json::from_str(&raw)?;
-    let content = chat
-        .choices
-        .first()
-        .ok_or_else(|| anyhow!("missing chat choice"))?
-        .message
-        .content
-        .trim()
-        .to_string();
+    let content = crate::ai::common::parse_chat_content(&raw)?;
 
     let cmd: CommandJson = serde_json::from_str(&content)?;
 
