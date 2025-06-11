@@ -1,5 +1,5 @@
 use shopbot::tests::util::init_test_db;
-use shopbot::{archive, nuke_list, LIST_ARCHIVED, LIST_NUKED};
+use shopbot::{archive, nuke, LIST_ARCHIVED, LIST_NUKED};
 use teloxide::{
     prelude::*,
     types::{Message, MessageId},
@@ -84,7 +84,7 @@ async fn nuke_clears_data_and_sends_confirmation() {
     )
     .unwrap();
 
-    nuke_list(bot, msg, &db, 5).await.unwrap();
+    nuke(bot, msg, &db, 5).await.unwrap();
 
     let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM items")
         .fetch_one(&*db)

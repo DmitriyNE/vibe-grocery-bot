@@ -64,7 +64,7 @@ async fn dispatcher_add_then_list() {
                             }
                             Command::Share => shopbot::share_list(bot, msg.chat.id, &db).await?,
                             Command::Nuke => {
-                                shopbot::nuke_list(bot, msg, &db, delete_after_timeout).await?
+                                shopbot::nuke(bot, msg, &db, delete_after_timeout).await?
                             }
                             Command::Parse => {
                                 shopbot::add_items_from_parsed_text(bot, msg, db, ai_config).await?
