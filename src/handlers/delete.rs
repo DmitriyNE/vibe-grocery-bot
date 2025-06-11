@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use teloxide::{
     prelude::*,
     types::{
-        ChatId, InlineKeyboardButton, InlineKeyboardMarkup, MessageId, MaybeInaccessibleMessage,
+        ChatId, InlineKeyboardButton, InlineKeyboardMarkup, MaybeInaccessibleMessage, MessageId,
         User, UserId,
     },
 };
@@ -87,7 +87,8 @@ async fn start_delete_session(
         "Starting delete session",
     );
 
-    db.init_delete_session(user.id.0 as i64, msg.chat.id).await?;
+    db.init_delete_session(user.id.0 as i64, msg.chat.id)
+        .await?;
 
     let (base_text, keyboard) = format_delete_list(items, &HashSet::new());
     let chat_name = msg
@@ -103,12 +104,14 @@ async fn start_delete_session(
         .await
     {
         Ok(dm_msg) => {
-            db.set_delete_dm_message(user.id.0 as i64, dm_msg.id).await?;
+            db.set_delete_dm_message(user.id.0 as i64, dm_msg.id)
+                .await?;
             if !msg.chat.is_private() {
                 let info = bot
                     .send_message(msg.chat.id, delete_user_selecting_text(&user.first_name))
                     .await?;
-                db.set_delete_notice(user.id.0 as i64, msg.chat.id, info.id).await?;
+                db.set_delete_notice(user.id.0 as i64, msg.chat.id, info.id)
+                    .await?;
             }
         }
         Err(err) => {
@@ -181,7 +184,8 @@ async fn toggle_selection(
         } else {
             session.selected.insert(id);
         }
-        db.update_delete_selection(user_id, &session.selected).await?;
+        db.update_delete_selection(user_id, &session.selected)
+            .await?;
         let items = db.list_items(session.chat_id).await?;
         let (text, keyboard) = format_delete_list(&items, &session.selected);
         if let Err(err) = bot
@@ -273,14 +277,20 @@ mod tests {
     use super::*;
     use crate::tests::util::init_test_db;
     use teloxide::types::{ChatId, MaybeInaccessibleMessage, MessageId, UserId};
-    use wiremock::{matchers::{method, path}, Mock, MockServer, ResponseTemplate};
+    use wiremock::{
+        matchers::{method, path},
+        Mock, MockServer, ResponseTemplate,
+    };
 
     #[tokio::test]
     async fn cleanup_previous_session_deletes_messages() {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
             .and(path("/botTEST/DeleteMessage"))
-            .respond_with(ResponseTemplate::new(200).set_body_raw(r#"{"ok":true,"result":true}"#, "application/json"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_raw(r#"{"ok":true,"result":true}"#, "application/json"),
+            )
             .expect(2)
             .mount(&server)
             .await;
@@ -288,9 +298,15 @@ mod tests {
         let bot = Bot::new("TEST").set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
         let db = init_test_db().await;
         let user = UserId(1);
-        db.init_delete_session(user.0 as i64, ChatId(1)).await.unwrap();
-        db.set_delete_notice(user.0 as i64, ChatId(1), MessageId(10)).await.unwrap();
-        db.set_delete_dm_message(user.0 as i64, MessageId(11)).await.unwrap();
+        db.init_delete_session(user.0 as i64, ChatId(1))
+            .await
+            .unwrap();
+        db.set_delete_notice(user.0 as i64, ChatId(1), MessageId(10))
+            .await
+            .unwrap();
+        db.set_delete_dm_message(user.0 as i64, MessageId(11))
+            .await
+            .unwrap();
 
         cleanup_previous_session(&bot, &db, user).await.unwrap();
         server.verify().await;
@@ -301,7 +317,10 @@ mod tests {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
             .and(path("/botTEST/EditMessageText"))
-            .respond_with(ResponseTemplate::new(200).set_body_raw(r#"{"ok":true,"result":true}"#, "application/json"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_raw(r#"{"ok":true,"result":true}"#, "application/json"),
+            )
             .expect(1)
             .mount(&server)
             .await;
