@@ -135,8 +135,8 @@ impl Database {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::util::init_test_db;
     use proptest::prelude::*;
-    use sqlx::sqlite::SqlitePoolOptions;
     use teloxide::types::{ChatId, MessageId};
 
     #[test]
@@ -187,33 +187,9 @@ mod tests {
         }
     }
 
-    async fn setup_db() -> Database {
-        let pool = SqlitePoolOptions::new()
-            .max_connections(1)
-            .connect("sqlite::memory:")
-            .await
-            .unwrap();
-
-        sqlx::query(
-            "CREATE TABLE delete_session(
-                user_id INTEGER PRIMARY KEY,
-                chat_id INTEGER NOT NULL,
-                selected TEXT NOT NULL DEFAULT '',
-                notice_chat_id INTEGER,
-                notice_message_id INTEGER,
-                dm_message_id INTEGER
-            )",
-        )
-        .execute(&pool)
-        .await
-        .unwrap();
-
-        Database::new(pool)
-    }
-
     #[tokio::test]
     async fn delete_session_roundtrip() -> Result<()> {
-        let db = setup_db().await;
+        let db = init_test_db().await;
         let user = 1i64;
         let chat_a = ChatId(10);
         db.init_delete_session(user, chat_a).await?;
