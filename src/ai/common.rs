@@ -17,6 +17,20 @@ struct ChatResponse {
     choices: Vec<ChatChoice>,
 }
 
+/// Extract the first choice's message content from a chat completion response.
+pub fn parse_chat_content(raw: &str) -> Result<String> {
+    let chat: ChatResponse = serde_json::from_str(raw)?;
+    let content = chat
+        .choices
+        .first()
+        .ok_or_else(|| anyhow!("missing chat choice"))?
+        .message
+        .content
+        .trim()
+        .to_string();
+    Ok(content)
+}
+
 #[derive(Deserialize)]
 struct ItemsJson {
     items: Vec<String>,
@@ -100,15 +114,7 @@ pub async fn request_items(
     let snippet: String = raw.chars().take(200).collect();
     debug!(snippet = %snippet, "chat response body");
     trace!(raw = %raw, "chat response");
-    let chat: ChatResponse = serde_json::from_str(&raw)?;
-    let content = chat
-        .choices
-        .first()
-        .ok_or_else(|| anyhow!("missing chat choice"))?
-        .message
-        .content
-        .trim()
-        .to_string();
+    let content = parse_chat_content(&raw)?;
 
     let items_json: ItemsJson = serde_json::from_str(&content)?;
 
