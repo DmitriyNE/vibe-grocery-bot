@@ -2,7 +2,7 @@ use futures_util::StreamExt;
 use teloxide::{
     net::Download,
     prelude::*,
-    types::{ChatId, MessageId},
+    types::{ChatId, InlineKeyboardMarkup, MessageId},
     RequestError,
 };
 
@@ -41,6 +41,40 @@ pub fn delete_after(
     })
 }
 
+/// Attempt to delete a message and log a warning on failure.
+pub async fn try_delete_message(bot: &Bot, chat_id: ChatId, message_id: MessageId) {
+    if let Err(err) = bot.delete_message(chat_id, message_id).await {
+        tracing::warn!(
+            error = %err,
+            chat_id = chat_id.0,
+            message_id = message_id.0,
+            "Failed to delete message",
+        );
+    }
+}
+
+/// Attempt to edit a message and log a warning on failure.
+pub async fn try_edit_message(
+    bot: &Bot,
+    chat_id: ChatId,
+    message_id: MessageId,
+    text: impl Into<String>,
+    markup: InlineKeyboardMarkup,
+) {
+    if let Err(err) = bot
+        .edit_message_text(chat_id, message_id, text)
+        .reply_markup(markup)
+        .await
+    {
+        tracing::warn!(
+            error = %err,
+            chat_id = chat_id.0,
+            message_id = message_id.0,
+            "Failed to edit message",
+        );
+    }
+}
+
 /// Download a file from Telegram and return the raw bytes.
 pub async fn download_file(bot: &Bot, path: &str) -> Result<Vec<u8>, RequestError> {
     let mut data = Vec::new();
@@ -50,4 +84,53 @@ pub async fn download_file(bot: &Bot, path: &str) -> Result<Vec<u8>, RequestErro
     }
     tracing::trace!(size = data.len(), "downloaded file bytes");
     Ok(data)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use teloxide::{types::InlineKeyboardButton, RequestError};
+    use wiremock::{
+        matchers::{method, path},
+        Mock, MockServer, ResponseTemplate,
+    };
+
+    #[tokio::test]
+    async fn try_delete_message_sends_request() -> Result<(), RequestError> {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/botTEST/DeleteMessage"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_raw(r#"{"ok":true,"result":true}"#, "application/json"),
+            )
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let bot = Bot::new("TEST").set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
+        try_delete_message(&bot, ChatId(1), MessageId(2)).await;
+        server.verify().await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn try_edit_message_sends_request() -> Result<(), RequestError> {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/botTEST/EditMessageText"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_raw(r#"{"ok":true,"result":true}"#, "application/json"),
+            )
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let bot = Bot::new("TEST").set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
+        let markup = InlineKeyboardMarkup::new(Vec::<Vec<InlineKeyboardButton>>::new());
+        try_edit_message(&bot, ChatId(1), MessageId(2), "hi", markup).await;
+        server.verify().await;
+        Ok(())
+    }
 }
