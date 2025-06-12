@@ -1,5 +1,5 @@
 use crate::db::Database;
-use crate::utils::download_file;
+use crate::utils::download_telegram_file;
 use anyhow::Result;
 use teloxide::prelude::*;
 
@@ -51,8 +51,7 @@ pub async fn add_items_from_voice(
         None => return Ok(()),
     };
 
-    let file = bot.get_file(&voice.file.id).await?;
-    let audio = download_file(&bot, &file.path).await?;
+    let audio = download_telegram_file(&bot, &voice.file.id).await?;
 
     match transcribe_audio(
         &config.stt_model,
