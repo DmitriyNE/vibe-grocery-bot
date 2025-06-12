@@ -1,7 +1,19 @@
 use crate::db::Item;
 use crate::db::{ChatKey, Database, ItemId};
 use crate::utils::download_file;
-use teloxide::prelude::*;
+            let text = found.text;
+            tracing::debug!(
+                chat_id = chat_id.0,
+                item_id = found.id.0,
+                %text,
+                "Matched voice item for deletion"
+            );
+            deleted.push(text);
+    tracing::debug!(
+        chat_id = chat_id.0,
+        count = ids.len(),
+        "Deleted matched items"
+    );
 
 use crate::ai::config::AiConfig;
 use crate::ai::gpt::{interpret_voice_command, VoiceCommand};
