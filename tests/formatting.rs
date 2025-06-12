@@ -1,5 +1,5 @@
-use shopbot::{format_delete_list, format_list, format_plain_list, Item};
 use shopbot::db::ItemId;
+use shopbot::{format_delete_list, format_list, format_plain_list, Item};
 
 fn sample_items() -> Vec<Item> {
     vec![
