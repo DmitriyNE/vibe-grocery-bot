@@ -1,4 +1,5 @@
 use shopbot::tests::util::init_test_db;
+use shopbot::ListService;
 use teloxide::{prelude::*, utils::command::BotCommands};
 use wiremock::{matchers::method, Mock, MockServer, ResponseTemplate};
 
@@ -54,18 +55,17 @@ async fn dispatcher_add_then_list() {
                      db: shopbot::db::Database,
                      ai_config: Option<shopbot::ai::config::AiConfig>,
                      delete_after_timeout: u64| async move {
+                        let service = ListService::new(&db);
                         match cmd {
                             Command::Start | Command::Help => shopbot::help(bot, msg).await?,
-                            Command::List => shopbot::send_list(bot, msg.chat.id, &db).await?,
-                            Command::Archive => shopbot::archive(bot, msg.chat.id, &db).await?,
+                            Command::List => service.send_list(bot, msg.chat.id).await?,
+                            Command::Archive => service.archive(bot, msg.chat.id).await?,
                             Command::Delete => {
                                 shopbot::enter_delete_mode(bot, msg, &db, delete_after_timeout)
                                     .await?
                             }
-                            Command::Share => shopbot::share_list(bot, msg.chat.id, &db).await?,
-                            Command::Nuke => {
-                                shopbot::nuke_list(bot, msg, &db, delete_after_timeout).await?
-                            }
+                            Command::Share => service.share_list(bot, msg.chat.id).await?,
+                            Command::Nuke => service.nuke(bot, msg, delete_after_timeout).await?,
                             Command::Parse => {
                                 shopbot::add_items_from_parsed_text(bot, msg, db, ai_config).await?
                             }

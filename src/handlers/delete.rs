@@ -15,7 +15,7 @@ use crate::messages::{
     DELETE_DONE_LABEL, DELETE_SELECT_PROMPT, NO_ACTIVE_LIST_TO_EDIT,
 };
 
-use super::list::update_list_message;
+use super::list_service::ListService;
 use crate::utils::{try_delete_message, try_edit_message};
 
 pub fn format_delete_list(
@@ -130,7 +130,9 @@ async fn process_done_callback(
             db.delete_item(session.chat_id, *id).await?;
         }
         if let Some(main_list_id) = db.get_last_list_message_id(session.chat_id).await? {
-            update_list_message(bot, session.chat_id, MessageId(main_list_id), db).await?;
+            ListService::new(db)
+                .update_message(bot, session.chat_id, MessageId(main_list_id))
+                .await?;
         }
         if let Some((chat_id, notice_id)) = session.notice {
             try_delete_message(bot, chat_id, notice_id).await;
@@ -219,7 +221,9 @@ pub async fn callback_handler(bot: Bot, q: CallbackQuery, db: Database) -> Resul
             }
         } else if let Ok(id) = data.parse::<i64>() {
             db.toggle_item(msg.chat().id, id).await?;
-            update_list_message(&bot, msg.chat().id, msg.id(), &db).await?;
+            ListService::new(&db)
+                .update_message(&bot, msg.chat().id, msg.id())
+                .await?;
         }
     }
 
