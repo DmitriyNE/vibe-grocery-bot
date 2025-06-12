@@ -25,7 +25,11 @@ pub async fn parse_photo_items_inner(
     let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
     let data_url = format!("data:image/png;base64,{}", encoded);
     let prompt = "Extract the items shown in the photo. Respond with a JSON object like {\"items\": [\"apples\"]}.";
-    let body = crate::ai::common::build_image_chat_body(model, prompt, &data_url);
+    let body = crate::ai::common::build_chat_body(
+        model,
+        prompt,
+        serde_json::json!([ { "type": "image_url", "image_url": { "url": &data_url } } ]),
+    );
 
     request_items(api_key, &body, url).await
 }
