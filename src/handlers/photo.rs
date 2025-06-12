@@ -1,5 +1,5 @@
 use crate::db::Database;
-use crate::utils::download_file;
+use crate::utils::download_telegram_file;
 use anyhow::Result;
 use teloxide::prelude::*;
 
@@ -32,9 +32,7 @@ pub async fn add_items_from_photo(
         return Ok(());
     };
 
-    let file = bot.get_file(file_id).await?;
-    let bytes = download_file(&bot, &file.path).await?;
-    tracing::trace!(size = bytes.len(), "downloaded photo bytes");
+    let bytes = download_telegram_file(&bot, file_id).await?;
 
     tracing::debug!(model = %config.vision_model, "parsing photo with OpenAI vision");
     let items = match parse_photo_items(

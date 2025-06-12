@@ -1,3 +1,4 @@
+use anyhow::Result;
 use futures_util::StreamExt;
 use teloxide::{
     net::Download,
@@ -86,9 +87,19 @@ pub async fn download_file(bot: &Bot, path: &str) -> Result<Vec<u8>, RequestErro
     Ok(data)
 }
 
+/// Fetch a Telegram file by its `file_id` and return the raw bytes.
+pub async fn download_telegram_file(bot: &Bot, file_id: &str) -> Result<Vec<u8>> {
+    let file = bot.get_file(file_id).await?;
+    tracing::debug!(path = %file.path, "Downloading Telegram file");
+    let bytes = download_file(bot, &file.path).await?;
+    tracing::debug!(path = %file.path, size = bytes.len(), "Finished download");
+    Ok(bytes)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::Result;
     use teloxide::{types::InlineKeyboardButton, RequestError};
     use wiremock::{
         matchers::{method, path},
@@ -130,6 +141,34 @@ mod tests {
         let bot = Bot::new("TEST").set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
         let markup = InlineKeyboardMarkup::new(Vec::<Vec<InlineKeyboardButton>>::new());
         try_edit_message(&bot, ChatId(1), MessageId(2), "hi", markup).await;
+        server.verify().await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn download_telegram_file_gets_bytes() -> Result<()> {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/botTEST/GetFile"))
+            .respond_with(ResponseTemplate::new(200).set_body_raw(
+                r#"{"ok":true,"result":{"file_id":"f","file_unique_id":"u","file_path":"path"}}"#,
+                "application/json",
+            ))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/file/botTEST/path"))
+            .respond_with(ResponseTemplate::new(200).set_body_raw("hi", "application/octet-stream"))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let url = reqwest::Url::parse(&server.uri()).unwrap();
+        let bot = Bot::new("TEST").set_api_url(url);
+        let bytes = download_telegram_file(&bot, "f").await?;
+        assert_eq!(bytes, b"hi");
         server.verify().await;
         Ok(())
     }
