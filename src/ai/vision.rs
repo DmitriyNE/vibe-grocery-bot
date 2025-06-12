@@ -1,4 +1,5 @@
 use crate::ai::common::{request_items, OPENAI_CHAT_URL};
+use crate::ai::prompts::PHOTO_PARSING_PROMPT;
 use anyhow::Result;
 use base64::Engine as _;
 use tracing::instrument;
@@ -24,8 +25,7 @@ pub async fn parse_photo_items_inner(
 ) -> Result<Vec<String>> {
     let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
     let data_url = format!("data:image/png;base64,{}", encoded);
-    let prompt = "Extract the items shown in the photo. Respond with a JSON object like {\"items\": [\"apples\"]}.";
-    let body = crate::ai::common::build_image_chat_body(model, prompt, &data_url);
+    let body = crate::ai::common::build_image_chat_body(model, PHOTO_PARSING_PROMPT, &data_url);
 
     request_items(api_key, &body, url).await
 }
