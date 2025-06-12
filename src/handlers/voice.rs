@@ -1,7 +1,6 @@
-
+use crate::db::Item;
 use crate::db::{ChatKey, Database, ItemId};
 use crate::utils::download_file;
-use anyhow::Result;
 use teloxide::prelude::*;
 
 use crate::ai::config::AiConfig;
