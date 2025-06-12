@@ -1,8 +1,10 @@
 pub use teloxide::types::ChatId;
 
+/// Identifier for a chat.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ChatKey(pub i64);
 
+/// Identifier for an item.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ItemId(pub i64);
 
