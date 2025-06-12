@@ -1,3 +1,4 @@
+use shopbot::db::ChatKey;
 use shopbot::tests::util::init_test_db;
 use shopbot::{archive, nuke_list, LIST_ARCHIVED, LIST_NUKED};
 use teloxide::{
@@ -32,8 +33,9 @@ async fn archive_clears_data_and_sends_confirmation() {
     let bot = Bot::new("TEST").set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
     let db = init_test_db().await;
     let chat = ChatId(1);
-    db.add_item(chat, "Milk").await.unwrap();
-    db.update_last_list_message_id(chat, MessageId(10))
+    let key = ChatKey(chat.0);
+    db.add_item(key, "Milk").await.unwrap();
+    db.update_last_list_message_id(key, MessageId(10))
         .await
         .unwrap();
 
@@ -44,7 +46,7 @@ async fn archive_clears_data_and_sends_confirmation() {
         .await
         .unwrap();
     assert_eq!(count.0, 0);
-    assert!(db.get_last_list_message_id(chat).await.unwrap().is_none());
+    assert!(db.get_last_list_message_id(key).await.unwrap().is_none());
 
     server.verify().await;
 }
@@ -74,8 +76,9 @@ async fn nuke_clears_data_and_sends_confirmation() {
     let bot = Bot::new("TEST").set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
     let db = init_test_db().await;
     let chat = ChatId(1);
-    db.add_item(chat, "Milk").await.unwrap();
-    db.update_last_list_message_id(chat, MessageId(5))
+    let key = ChatKey(chat.0);
+    db.add_item(key, "Milk").await.unwrap();
+    db.update_last_list_message_id(key, MessageId(5))
         .await
         .unwrap();
 
@@ -91,7 +94,7 @@ async fn nuke_clears_data_and_sends_confirmation() {
         .await
         .unwrap();
     assert_eq!(count.0, 0);
-    assert!(db.get_last_list_message_id(chat).await.unwrap().is_none());
+    assert!(db.get_last_list_message_id(key).await.unwrap().is_none());
 
     server.verify().await;
 }

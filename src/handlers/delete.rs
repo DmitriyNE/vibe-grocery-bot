@@ -1,4 +1,4 @@
-use crate::db::Database;
+use crate::db::{ChatKey, Database, ItemId};
 use anyhow::Result;
 use std::collections::HashSet;
 use teloxide::{
@@ -20,7 +20,7 @@ use crate::utils::{try_delete_message, try_edit_message};
 
 pub fn format_delete_list(
     items: &[Item],
-    selected: &HashSet<i64>,
+    selected: &HashSet<ItemId>,
 ) -> (String, InlineKeyboardMarkup) {
     let text = DELETE_SELECT_PROMPT.to_string();
 
@@ -74,7 +74,7 @@ async fn start_delete_session(
         "Starting delete session",
     );
 
-    db.init_delete_session(user.id.0 as i64, msg.chat.id)
+    db.init_delete_session(user.id.0 as i64, ChatKey(msg.chat.id.0))
         .await?;
 
     let (base_text, keyboard) = format_delete_list(items, &HashSet::new());
@@ -97,7 +97,7 @@ async fn start_delete_session(
                 let info = bot
                     .send_message(msg.chat.id, delete_user_selecting_text(&user.first_name))
                     .await?;
-                db.set_delete_notice(user.id.0 as i64, msg.chat.id, info.id)
+                db.set_delete_notice(user.id.0 as i64, ChatKey(msg.chat.id.0), info.id)
                     .await?;
             }
         }
@@ -130,7 +130,7 @@ async fn process_done_callback(
             db.delete_item(session.chat_id, *id).await?;
         }
         if let Some(main_list_id) = db.get_last_list_message_id(session.chat_id).await? {
-            update_list_message(bot, session.chat_id, MessageId(main_list_id), db).await?;
+            update_list_message(bot, session.chat_id.into(), MessageId(main_list_id), db).await?;
         }
         if let Some((chat_id, notice_id)) = session.notice {
             try_delete_message(bot, chat_id, notice_id).await;
@@ -145,7 +145,7 @@ async fn toggle_selection(
     bot: &Bot,
     msg: &MaybeInaccessibleMessage,
     user_id: i64,
-    id: i64,
+    id: ItemId,
     db: &Database,
 ) -> Result<()> {
     if let Some(mut session) = db.get_delete_session(user_id).await? {
@@ -179,7 +179,8 @@ pub async fn enter_delete_mode(
     );
     try_delete_message(&bot, msg.chat.id, msg.id).await;
 
-    if db.get_last_list_message_id(msg.chat.id).await?.is_none() {
+    let chat_key = ChatKey(msg.chat.id.0);
+    if db.get_last_list_message_id(chat_key).await?.is_none() {
         let sent_msg = bot
             .send_message(msg.chat.id, NO_ACTIVE_LIST_TO_EDIT)
             .await?;
@@ -199,7 +200,7 @@ pub async fn enter_delete_mode(
 
     cleanup_previous_session(&bot, db, user.id).await?;
 
-    let items = db.list_items(msg.chat.id).await?;
+    let items = db.list_items(chat_key).await?;
     if items.is_empty() {
         return Ok(());
     }
@@ -215,10 +216,10 @@ pub async fn callback_handler(bot: Bot, q: CallbackQuery, db: Database) -> Resul
             if id_str == "done" {
                 process_done_callback(&bot, &msg, user_id, &db).await?;
             } else if let Ok(id) = id_str.parse::<i64>() {
-                toggle_selection(&bot, &msg, user_id, id, &db).await?;
+                toggle_selection(&bot, &msg, user_id, ItemId(id), &db).await?;
             }
         } else if let Ok(id) = data.parse::<i64>() {
-            db.toggle_item(msg.chat().id, id).await?;
+            db.toggle_item(ChatKey(msg.chat().id.0), ItemId(id)).await?;
             update_list_message(&bot, msg.chat().id, msg.id(), &db).await?;
         }
     }
@@ -230,6 +231,7 @@ pub async fn callback_handler(bot: Bot, q: CallbackQuery, db: Database) -> Resul
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::db::ChatKey;
     use crate::tests::util::init_test_db;
     use teloxide::types::{ChatId, MaybeInaccessibleMessage, MessageId, UserId};
     use wiremock::{
@@ -253,10 +255,10 @@ mod tests {
         let bot = Bot::new("TEST").set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
         let db = init_test_db().await;
         let user = UserId(1);
-        db.init_delete_session(user.0 as i64, ChatId(1))
+        db.init_delete_session(user.0 as i64, ChatKey(1))
             .await
             .unwrap();
-        db.set_delete_notice(user.0 as i64, ChatId(1), MessageId(10))
+        db.set_delete_notice(user.0 as i64, ChatKey(1), MessageId(10))
             .await
             .unwrap();
         db.set_delete_dm_message(user.0 as i64, MessageId(11))
@@ -283,11 +285,12 @@ mod tests {
         let bot = Bot::new("TEST").set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
         let db = init_test_db().await;
         let chat = ChatId(1);
-        db.add_item(chat, "Milk").await.unwrap();
-        let items = db.list_items(chat).await.unwrap();
+        let key = ChatKey(chat.0);
+        db.add_item(key, "Milk").await.unwrap();
+        let items = db.list_items(key).await.unwrap();
         let item_id = items[0].id;
 
-        db.init_delete_session(1, chat).await.unwrap();
+        db.init_delete_session(1, key).await.unwrap();
         db.set_delete_dm_message(1, MessageId(5)).await.unwrap();
         let msg_json = r#"{"message_id":5,"date":0,"chat":{"id":1,"type":"private"}}"#;
         let msg: MaybeInaccessibleMessage = serde_json::from_str(msg_json).unwrap();

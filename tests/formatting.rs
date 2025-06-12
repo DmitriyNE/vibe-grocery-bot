@@ -1,14 +1,15 @@
 use shopbot::{format_delete_list, format_list, format_plain_list, Item};
+use shopbot::db::ItemId;
 
 fn sample_items() -> Vec<Item> {
     vec![
         Item {
-            id: 1,
+            id: ItemId(1),
             text: "Apples".to_string(),
             done: false,
         },
         Item {
-            id: 2,
+            id: ItemId(2),
             text: "Milk".to_string(),
             done: true,
         },
@@ -18,12 +19,12 @@ fn sample_items() -> Vec<Item> {
 fn all_done_items() -> Vec<Item> {
     vec![
         Item {
-            id: 1,
+            id: ItemId(1),
             text: "Apples".to_string(),
             done: true,
         },
         Item {
-            id: 2,
+            id: ItemId(2),
             text: "Milk".to_string(),
             done: true,
         },
@@ -51,7 +52,7 @@ fn test_format_delete_list() {
 
     let items = sample_items();
     let mut selected = HashSet::new();
-    selected.insert(1);
+    selected.insert(ItemId(1));
     let (text, keyboard) = format_delete_list(&items, &selected);
 
     assert_eq!(text, "Select items to delete, then tap 'Done Deleting'.");

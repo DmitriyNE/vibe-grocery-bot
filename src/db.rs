@@ -7,10 +7,12 @@ pub mod chat_state;
 pub mod database;
 pub mod delete_session;
 pub mod items;
+pub mod types;
 
 pub use database::Database;
 
 pub use items::Item;
+pub use types::{ChatKey, ItemId};
 
 pub fn prepare_sqlite_url(url: &str) -> String {
     if url.starts_with("sqlite:") && !url.contains("mode=") && !url.contains(":memory:") {

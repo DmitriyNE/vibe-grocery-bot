@@ -1,4 +1,4 @@
-use crate::db::{Database, Item};
+use crate::db::{ChatKey, Database, Item};
 use anyhow::Result;
 use teloxide::{
     prelude::*,
@@ -92,7 +92,7 @@ where
 {
     let mut added = 0usize;
     for item in items {
-        db.add_item(chat_id, &item).await?;
+        db.add_item(ChatKey(chat_id.0), &item).await?;
         added += 1;
     }
 
