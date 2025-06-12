@@ -1,7 +1,19 @@
-use crate::db::Database;
-use crate::utils::download_telegram_file;
-use anyhow::Result;
-use teloxide::prelude::*;
+use crate::db::Item;
+use crate::db::{ChatKey, Database, ItemId};
+use crate::utils::download_file;
+            let text = found.text;
+            tracing::debug!(
+                chat_id = chat_id.0,
+                item_id = found.id.0,
+                %text,
+                "Matched voice item for deletion"
+            );
+            deleted.push(text);
+    tracing::debug!(
+        chat_id = chat_id.0,
+        count = ids.len(),
+        "Deleted matched items"
+    );
 
 use crate::ai::config::AiConfig;
 use crate::ai::gpt::{interpret_voice_command, VoiceCommand};
@@ -13,12 +25,12 @@ use crate::db::Item;
 
 pub async fn delete_matching_items(
     db: &Database,
-    chat_id: ChatId,
+    chat_id: ChatKey,
     current: &mut Vec<Item>,
     items: &[String],
 ) -> Result<Vec<String>> {
     let mut deleted = Vec::new();
-    let mut ids = Vec::new();
+    let mut ids: Vec<ItemId> = Vec::new();
     for item in items {
         let needle = normalize_for_match(item);
         if let Some(pos) = current
@@ -68,7 +80,7 @@ pub async fn add_items_from_voice(
                 tracing::debug!("voice transcription empty; ignoring");
                 return Ok(());
             }
-            let mut current = db.list_items(msg.chat.id).await?;
+            let mut current = db.list_items(ChatKey(msg.chat.id.0)).await?;
             let list_texts: Vec<String> = current.iter().map(|i| i.text.clone()).collect();
             match interpret_voice_command(
                 &config.api_key,
@@ -93,7 +105,8 @@ pub async fn add_items_from_voice(
                 }
                 Ok(VoiceCommand::Delete(items)) => {
                     let deleted =
-                        delete_matching_items(&db, msg.chat.id, &mut current, &items).await?;
+                        delete_matching_items(&db, ChatKey(msg.chat.id.0), &mut current, &items)
+                            .await?;
                     if !deleted.is_empty() {
                         tracing::info!(
                             "Deleted {} item(s) via voice for chat {}",
@@ -142,14 +155,15 @@ mod tests {
     async fn delete_matching_multiple() {
         let db = init_test_db().await;
         let chat = ChatId(1);
+        let key = ChatKey(chat.0);
         for _ in 0..3 {
-            db.add_item(chat, "Item").await.unwrap();
+            db.add_item(key, "Item").await.unwrap();
         }
 
-        let mut current = db.list_items(chat).await.unwrap();
+        let mut current = db.list_items(key).await.unwrap();
         let deleted = delete_matching_items(
             &db,
-            chat,
+            key,
             &mut current,
             &["Item".to_string(), "Item".to_string(), "Item".to_string()],
         )
@@ -157,7 +171,7 @@ mod tests {
         .unwrap();
         assert_eq!(deleted.len(), 3);
         assert!(current.is_empty());
-        let remaining = db.list_items(chat).await.unwrap();
+        let remaining = db.list_items(key).await.unwrap();
         assert!(remaining.is_empty());
     }
 
@@ -165,14 +179,15 @@ mod tests {
     async fn delete_matching_partial() {
         let db = init_test_db().await;
         let chat = ChatId(1);
-        db.add_item(chat, "Apple").await.unwrap();
-        db.add_item(chat, "Banana").await.unwrap();
-        db.add_item(chat, "Carrot").await.unwrap();
+        let key = ChatKey(chat.0);
+        db.add_item(key, "Apple").await.unwrap();
+        db.add_item(key, "Banana").await.unwrap();
+        db.add_item(key, "Carrot").await.unwrap();
 
-        let mut current = db.list_items(chat).await.unwrap();
+        let mut current = db.list_items(key).await.unwrap();
         let deleted = delete_matching_items(
             &db,
-            chat,
+            key,
             &mut current,
             &["Banana".to_string(), "Carrot".to_string()],
         )
@@ -183,7 +198,7 @@ mod tests {
         assert_eq!(current.len(), 1);
         assert_eq!(current[0].text, "Apple");
 
-        let remaining = db.list_items(chat).await.unwrap();
+        let remaining = db.list_items(key).await.unwrap();
         assert_eq!(remaining.len(), 1);
         assert_eq!(remaining[0].text, "Apple");
     }

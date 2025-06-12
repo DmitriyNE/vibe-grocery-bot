@@ -5,7 +5,7 @@ use teloxide::{
 };
 
 use super::list::{format_list, format_plain_list};
-use crate::db::Database;
+use crate::db::{ChatKey, Database};
 use crate::messages::{
     ARCHIVED_LIST_HEADER, LIST_ARCHIVED, LIST_EMPTY, LIST_EMPTY_ADD_ITEM, LIST_NOW_EMPTY,
     LIST_NUKED, NO_ACTIVE_LIST_TO_ARCHIVE,
@@ -22,16 +22,15 @@ impl<'a> ListService<'a> {
     }
 
     pub async fn send_list(&self, bot: Bot, chat_id: ChatId) -> Result<()> {
-        if let Some(msg_id) = self.db.get_last_list_message_id(chat_id).await? {
+        let key = ChatKey(chat_id.0);
+        if let Some(msg_id) = self.db.get_last_list_message_id(key).await? {
             try_delete_message(&bot, chat_id, MessageId(msg_id)).await;
         }
 
-        let items = self.db.list_items(chat_id).await?;
+        let items = self.db.list_items(key).await?;
         if items.is_empty() {
             let sent = bot.send_message(chat_id, LIST_EMPTY_ADD_ITEM).await?;
-            self.db
-                .update_last_list_message_id(chat_id, sent.id)
-                .await?;
+            self.db.update_last_list_message_id(key, sent.id).await?;
             return Ok(());
         }
 
@@ -40,14 +39,13 @@ impl<'a> ListService<'a> {
             .send_message(chat_id, text)
             .reply_markup(keyboard)
             .await?;
-        self.db
-            .update_last_list_message_id(chat_id, sent.id)
-            .await?;
+        self.db.update_last_list_message_id(key, sent.id).await?;
         Ok(())
     }
 
     pub async fn share_list(&self, bot: Bot, chat_id: ChatId) -> Result<()> {
-        let items = self.db.list_items(chat_id).await?;
+        let key = ChatKey(chat_id.0);
+        let items = self.db.list_items(key).await?;
         if items.is_empty() {
             bot.send_message(chat_id, LIST_EMPTY).await?;
             return Ok(());
@@ -63,7 +61,8 @@ impl<'a> ListService<'a> {
         chat_id: ChatId,
         message_id: MessageId,
     ) -> Result<()> {
-        let items = self.db.list_items(chat_id).await?;
+        let key = ChatKey(chat_id.0);
+        let items = self.db.list_items(key).await?;
         if items.is_empty() {
             let markup = InlineKeyboardMarkup::new(Vec::<Vec<InlineKeyboardButton>>::new());
             try_edit_message(bot, chat_id, message_id, LIST_NOW_EMPTY, markup).await;
@@ -76,7 +75,8 @@ impl<'a> ListService<'a> {
     }
 
     pub async fn archive(&self, bot: Bot, chat_id: ChatId) -> Result<()> {
-        let last_message_id = match self.db.get_last_list_message_id(chat_id).await? {
+        let key = ChatKey(chat_id.0);
+        let last_message_id = match self.db.get_last_list_message_id(key).await? {
             Some(id) => id,
             None => {
                 bot.send_message(chat_id, NO_ACTIVE_LIST_TO_ARCHIVE).await?;
@@ -84,7 +84,7 @@ impl<'a> ListService<'a> {
             }
         };
 
-        let items = self.db.list_items(chat_id).await?;
+        let items = self.db.list_items(key).await?;
         if items.is_empty() {
             bot.send_message(chat_id, NO_ACTIVE_LIST_TO_ARCHIVE).await?;
             return Ok(());
@@ -103,8 +103,8 @@ impl<'a> ListService<'a> {
         )
         .await;
 
-        self.db.delete_all_items(chat_id).await?;
-        self.db.clear_last_list_message_id(chat_id).await?;
+        self.db.delete_all_items(key).await?;
+        self.db.clear_last_list_message_id(key).await?;
 
         bot.send_message(chat_id, LIST_ARCHIVED).await?;
         Ok(())
@@ -112,11 +112,12 @@ impl<'a> ListService<'a> {
 
     pub async fn nuke(&self, bot: Bot, msg: Message, delete_after_timeout: u64) -> Result<()> {
         try_delete_message(&bot, msg.chat.id, msg.id).await;
-        if let Some(list_message_id) = self.db.get_last_list_message_id(msg.chat.id).await? {
+        let key = ChatKey(msg.chat.id.0);
+        if let Some(list_message_id) = self.db.get_last_list_message_id(key).await? {
             try_delete_message(&bot, msg.chat.id, MessageId(list_message_id)).await;
         }
-        self.db.delete_all_items(msg.chat.id).await?;
-        self.db.clear_last_list_message_id(msg.chat.id).await?;
+        self.db.delete_all_items(key).await?;
+        self.db.clear_last_list_message_id(key).await?;
         let confirmation = bot.send_message(msg.chat.id, LIST_NUKED).await?;
         drop(crate::delete_after(
             bot.clone(),
