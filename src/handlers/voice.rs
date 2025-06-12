@@ -1,3 +1,4 @@
+
 use crate::db::{ChatKey, Database, ItemId};
 use crate::utils::download_file;
 use anyhow::Result;
@@ -34,7 +35,8 @@ pub async fn delete_matching_items(
     Ok(deleted)
 }
 
-use super::list::{insert_items, send_list};
+use super::list::insert_items;
+use super::list_service::ListService;
 
 pub async fn add_items_from_voice(
     bot: Bot,
@@ -51,8 +53,7 @@ pub async fn add_items_from_voice(
         None => return Ok(()),
     };
 
-    let file = bot.get_file(&voice.file.id).await?;
-    let audio = download_file(&bot, &file.path).await?;
+    let audio = download_telegram_file(&bot, &voice.file.id).await?;
 
     match transcribe_audio(
         &config.stt_model,
@@ -104,7 +105,9 @@ pub async fn add_items_from_voice(
                         let lines: Vec<String> = deleted.iter().map(|t| format!("• {t}")).collect();
                         let msg_text = format!("{VOICE_REMOVED_PREFIX}{}", lines.join("\n"));
                         bot.send_message(msg.chat.id, msg_text).await?;
-                        send_list(bot.clone(), msg.chat.id, &db).await?;
+                        ListService::new(&db)
+                            .send_list(bot.clone(), msg.chat.id)
+                            .await?;
                     }
                 }
                 Err(err) => {

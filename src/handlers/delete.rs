@@ -15,7 +15,7 @@ use crate::messages::{
     DELETE_DONE_LABEL, DELETE_SELECT_PROMPT, NO_ACTIVE_LIST_TO_EDIT,
 };
 
-use super::list::update_list_message;
+use super::list_service::ListService;
 use crate::utils::{try_delete_message, try_edit_message};
 
 pub fn format_delete_list(

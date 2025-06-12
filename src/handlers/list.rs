@@ -2,7 +2,7 @@ use crate::db::{ChatKey, Database, Item};
 use anyhow::Result;
 use teloxide::{
     prelude::*,
-    types::{ChatId, InlineKeyboardButton, InlineKeyboardMarkup, Message, MessageId},
+    types::{ChatId, InlineKeyboardButton, InlineKeyboardMarkup},
 };
 
 use super::list_service::ListService;
@@ -43,49 +43,6 @@ pub fn format_plain_list(items: &[Item]) -> String {
     text
 }
 
-pub async fn send_list(bot: Bot, chat_id: ChatId, db: &Database) -> Result<()> {
-    tracing::debug!(chat_id = chat_id.0, "Sending list");
-    ListService::new(db).send_list(bot, chat_id).await
-}
-
-pub async fn share_list(bot: Bot, chat_id: ChatId, db: &Database) -> Result<()> {
-    tracing::debug!(chat_id = chat_id.0, "Sharing list");
-    ListService::new(db).share_list(bot, chat_id).await
-}
-
-pub async fn update_list_message(
-    bot: &Bot,
-    chat_id: ChatId,
-    message_id: MessageId,
-    db: &Database,
-) -> Result<()> {
-    tracing::debug!(
-        chat_id = chat_id.0,
-        message_id = message_id.0,
-        "Updating list message",
-    );
-    ListService::new(db)
-        .update_message(bot, chat_id, message_id)
-        .await
-}
-
-pub async fn archive(bot: Bot, chat_id: ChatId, db: &Database) -> Result<()> {
-    tracing::debug!(chat_id = chat_id.0, "Archiving list");
-    ListService::new(db).archive(bot, chat_id).await
-}
-
-pub async fn nuke_list(
-    bot: Bot,
-    msg: Message,
-    db: &Database,
-    delete_after_timeout: u64,
-) -> Result<()> {
-    tracing::debug!(chat_id = msg.chat.id.0, "Nuking list");
-    ListService::new(db)
-        .nuke(bot, msg, delete_after_timeout)
-        .await
-}
-
 pub async fn insert_items<I>(bot: Bot, chat_id: ChatId, db: &Database, items: I) -> Result<usize>
 where
     I: IntoIterator<Item = String>,
@@ -98,7 +55,7 @@ where
 
     if added > 0 {
         tracing::debug!(chat_id = chat_id.0, added, "Inserted items");
-        send_list(bot, chat_id, db).await?;
+        ListService::new(db).send_list(bot, chat_id).await?;
     } else {
         tracing::debug!(chat_id = chat_id.0, "No items inserted");
     }

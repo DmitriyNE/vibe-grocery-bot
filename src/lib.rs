@@ -20,8 +20,8 @@ pub use config::Config;
 pub use db::Item;
 pub use handlers::{
     add_items_from_parsed_text, add_items_from_photo, add_items_from_text, add_items_from_voice,
-    archive, callback_handler, enter_delete_mode, format_delete_list, format_list,
-    format_plain_list, help, insert_items, nuke_list, send_list, share_list, show_system_info,
+    callback_handler, enter_delete_mode, format_delete_list, format_list, format_plain_list, help,
+    insert_items, show_system_info, ListService,
 };
 pub use messages::*;
 pub use system_info::get_system_info;
@@ -87,15 +87,16 @@ pub async fn run() -> Result<()> {
                      db: db::Database,
                      ai_config: Option<crate::ai::config::AiConfig>,
                      delete_after_timeout: u64| async move {
+                        let service = ListService::new(&db);
                         match cmd {
                             Command::Start | Command::Help => help(bot, msg).await?,
-                            Command::List => send_list(bot, msg.chat.id, &db).await?,
-                            Command::Archive => archive(bot, msg.chat.id, &db).await?,
+                            Command::List => service.send_list(bot, msg.chat.id).await?,
+                            Command::Archive => service.archive(bot, msg.chat.id).await?,
                             Command::Delete => {
                                 enter_delete_mode(bot, msg, &db, delete_after_timeout).await?
                             }
-                            Command::Share => share_list(bot, msg.chat.id, &db).await?,
-                            Command::Nuke => nuke_list(bot, msg, &db, delete_after_timeout).await?,
+                            Command::Share => service.share_list(bot, msg.chat.id).await?,
+                            Command::Nuke => service.nuke(bot, msg, delete_after_timeout).await?,
                             Command::Parse => {
                                 add_items_from_parsed_text(bot, msg, db, ai_config).await?
                             }
