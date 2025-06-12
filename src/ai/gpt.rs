@@ -1,5 +1,6 @@
-use crate::ai::common::{request_items, OPENAI_CHAT_URL};
+use crate::ai::common::{build_items_request, request_items, OPENAI_CHAT_URL};
 use anyhow::Result;
+use serde_json::Value;
 use tracing::instrument;
 
 /// Use the OpenAI Chat API to parse items from arbitrary text.
@@ -26,7 +27,7 @@ pub async fn parse_items_gpt_inner(
     url: &str,
 ) -> Result<Vec<String>> {
     let prompt = "Extract the items from the user's text. Use the nominative form for nouns when it does not change the meaning. Convert number words to digits so 'три ананаса' becomes '3 ананаса'. Respond with a JSON object like {\"items\": [\"1 milk\"]}";
-    let body = crate::ai::common::build_text_chat_body(model, prompt, text);
+    let body = build_items_request(model, prompt, Value::String(text.to_string()));
 
     request_items(api_key, &body, url).await
 }

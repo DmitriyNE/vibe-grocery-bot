@@ -44,14 +44,11 @@ pub fn build_text_chat_body(
     system_prompt: &str,
     user_text: &str,
 ) -> serde_json::Value {
-    serde_json::json!({
-        "model": model,
-        "response_format": { "type": "json_object" },
-        "messages": [
-            { "role": "system", "content": system_prompt },
-            { "role": "user", "content": user_text },
-        ]
-    })
+    build_items_request(
+        model,
+        system_prompt,
+        serde_json::Value::String(user_text.to_string()),
+    )
 }
 
 /// Build a chat completion request body for an image input.
@@ -60,15 +57,28 @@ pub fn build_image_chat_body(
     system_prompt: &str,
     image_url: &str,
 ) -> serde_json::Value {
+    build_items_request(
+        model,
+        system_prompt,
+        serde_json::json!([{
+            "type": "image_url",
+            "image_url": { "url": image_url },
+        }]),
+    )
+}
+
+/// Build a chat completion request body for item extraction.
+pub fn build_items_request(
+    model: &str,
+    prompt: &str,
+    user_payload: serde_json::Value,
+) -> serde_json::Value {
     serde_json::json!({
         "model": model,
         "response_format": { "type": "json_object" },
         "messages": [
-            { "role": "system", "content": system_prompt },
-            {
-                "role": "user",
-                "content": [ { "type": "image_url", "image_url": { "url": image_url } } ],
-            }
+            { "role": "system", "content": prompt },
+            { "role": "user", "content": user_payload },
         ]
     })
 }
