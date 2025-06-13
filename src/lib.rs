@@ -20,8 +20,8 @@ pub use config::Config;
 pub use db::Item;
 pub use handlers::{
     add_items_from_parsed_text, add_items_from_photo, add_items_from_text, add_items_from_voice,
-    callback_handler, enter_delete_mode, format_delete_list, format_list, format_plain_list, help,
-    insert_items, show_system_info, ListService,
+    ai_mode, callback_handler, enter_delete_mode, format_delete_list, format_list,
+    format_plain_list, help, insert_items, show_system_info, ListService,
 };
 pub use messages::*;
 pub use system_info::get_system_info;
@@ -49,6 +49,7 @@ pub async fn run() -> Result<()> {
     }
     let ai_config = config.ai.clone();
     let delete_after_timeout = config.delete_after_timeout;
+    let detector_model = config.detector_model.clone();
 
     // --- SQLite Pool ---
     let db_url = db::prepare_sqlite_url(&config.db_url);
@@ -86,7 +87,8 @@ pub async fn run() -> Result<()> {
                      cmd: Command,
                      db: db::Database,
                      ai_config: Option<crate::ai::config::AiConfig>,
-                     delete_after_timeout: u64| async move {
+                     delete_after_timeout: u64,
+                     detector_model: Option<String>| async move {
                         let service = ListService::new(&db);
                         match cmd {
                             Command::Start | Command::Help => help(bot, msg).await?,
@@ -101,6 +103,7 @@ pub async fn run() -> Result<()> {
                                 add_items_from_parsed_text(bot, msg, db, ai_config).await?
                             }
                             Command::Info => show_system_info(bot, msg).await?,
+                            Command::AiMode => ai_mode(bot, msg, detector_model.clone()).await?,
                         }
                         Ok(())
                     },
@@ -110,7 +113,12 @@ pub async fn run() -> Result<()> {
 
     // --- Dispatcher ---
     Dispatcher::builder(bot, handler)
-        .dependencies(dptree::deps![db, ai_config, delete_after_timeout])
+        .dependencies(dptree::deps![
+            db,
+            ai_config,
+            delete_after_timeout,
+            detector_model
+        ])
         .enable_ctrlc_handler()
         .build()
         .dispatch()

@@ -24,4 +24,6 @@ pub enum Command {
     Parse,
     #[command(description = "show system information.")]
     Info,
+    #[command(description = "run AI webcam mode.")]
+    AiMode,
 }

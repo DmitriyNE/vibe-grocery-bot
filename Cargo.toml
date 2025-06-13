@@ -19,6 +19,10 @@ futures-util = "0.3"
 base64 = "0.22"
 git-version = "0.3"
 unicode-segmentation = "1.12"
+candle-core = "0.9.1"
+candle-onnx = "0.9.1"
+nokhwa = { version = "0.10.7", default-features = false, features = ["input-native", "decoding"] }
+prost = { version = "0.12", default-features = false, features = ["std"] }
 
 [dev-dependencies]
 proptest = "1.7"

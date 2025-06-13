@@ -15,6 +15,10 @@ Send any message to the bot. Every non-empty line becomes an item. If you send a
 - `/nuke` – wipe the list completely
 - `/parse` – let GPT parse this message into items
 - `/info` – show commit hash and whether the build is on a release or how far it is ahead of the latest release
+- `/ai_mode` – run the webcam detection loop
+
+The AI mode expects a YOLOv8 model in ONNX format. Set `YOLO_MODEL_PATH` to the
+model file location or place `yolov8n.onnx` in the working directory.
 
 ## Installation
 
@@ -51,6 +55,7 @@ Set these variables as needed before running:
 - `OPENAI_VISION_MODEL` – optional vision model name (defaults to `gpt-4o`)
 - `OPENAI_CHAT_URL` – optional URL for the chat completion API
 - `OPENAI_STT_URL` – optional URL for the transcription API
+- `YOLO_MODEL_PATH` – optional path to a YOLOv8 ONNX file used for `/ai_mode`
 
 The database file is created automatically if needed. Embedded SQLx migrations in the `migrations/` directory are executed on startup.
 
