@@ -18,7 +18,7 @@ Send any message to the bot. Every non-empty line becomes an item. If you send a
 
 ## Installation
 
-1. Install a recent [Rust toolchain](https://www.rust-lang.org/tools/install) and the `protobuf-compiler` package.
+1. Install a recent [Rust toolchain](https://www.rust-lang.org/tools/install).
 2. Clone this repository and build the binary:
    ```bash
    cargo build --release

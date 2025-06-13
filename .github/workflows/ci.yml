@@ -25,8 +25,6 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
-      - name: Install protoc
-        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
       - name: Cargo fmt
         run: cargo fmt --all -- --check
       - name: Cargo clippy
