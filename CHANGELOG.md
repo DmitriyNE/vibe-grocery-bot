@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 6. Temporary message timeout configurable via `DELETE_AFTER_TIMEOUT`.
 7. Default SQLite path renamed to `items.db`.
 8. User-facing messages use generic item list wording.
+9. Building now requires the `protobuf-compiler` package.
 
 ## [0.3.0] - 2025-06-09
 1. `/info` command shows commit hash and release version or how many commits the build is ahead of the latest release
