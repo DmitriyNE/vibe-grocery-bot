@@ -23,4 +23,4 @@ unicode-segmentation = "1.12"
 [dev-dependencies]
 proptest = "1.7"
 wiremock = "0.6"
-serial_test = "2"
+serial_test = "3"
