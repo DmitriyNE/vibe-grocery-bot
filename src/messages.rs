@@ -9,6 +9,7 @@ pub const HELP_TEXT: &str =
              <b>Commands:</b>\n\
              /list - Show the current list.\n\
              /archive - Finalize and archive the current list, starting a new one.\n\
+             /done - Archive only checked items, keeping the rest.\n\
              /delete - Show a temporary panel to delete items from the list.\n\
              /share - Send the list as plain text for copying.\n\
              /nuke - Completely delete the current list.\n\
@@ -25,6 +26,8 @@ pub const LIST_EMPTY: &str = "Your list is empty!";
 pub const LIST_NOW_EMPTY: &str = "List is now empty!";
 pub const LIST_ARCHIVED: &str = "List archived! Send a message to start a new one.";
 pub const LIST_NUKED: &str = "The active list has been nuked.";
+pub const CHECKED_ITEMS_ARCHIVED: &str = "Checked items archived!";
+pub const NO_CHECKED_ITEMS_TO_ARCHIVE: &str = "There are no checked items to archive.";
 
 pub const DELETE_SELECT_PROMPT: &str = "Select items to delete, then tap 'Done Deleting'.";
 pub const DELETE_DONE_LABEL: &str = "🗑️ Done Deleting";
