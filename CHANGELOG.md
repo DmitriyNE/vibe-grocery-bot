@@ -3,6 +3,8 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+
+## [0.4.0] - 2025-06-22
 1. Add index on `items.chat_id` to speed up queries.
 2. Vision model configurable via `OPENAI_VISION_MODEL`.
 3. Custom OpenAI endpoints via `OPENAI_CHAT_URL` and `OPENAI_STT_URL`.
