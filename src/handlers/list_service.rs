@@ -93,15 +93,8 @@ impl<'a> ListService<'a> {
         let (final_text, _) = format_list(&items);
         let archived_text = format!("{ARCHIVED_LIST_HEADER}\n{}", final_text);
 
-        let markup = InlineKeyboardMarkup::new(Vec::<Vec<InlineKeyboardButton>>::new());
-        try_edit_message(
-            &bot,
-            chat_id,
-            MessageId(last_message_id),
-            archived_text,
-            markup,
-        )
-        .await;
+        try_delete_message(&bot, chat_id, MessageId(last_message_id)).await;
+        bot.send_message(chat_id, archived_text).await?;
 
         self.db.delete_all_items(chat_id).await?;
         self.db.clear_last_list_message_id(chat_id).await?;
@@ -147,18 +140,13 @@ impl<'a> ListService<'a> {
 
         let (archived_text, _) = format_list(&done);
         let archived_text = format!("{ARCHIVED_LIST_HEADER}\n{}", archived_text);
-        let markup = InlineKeyboardMarkup::new(Vec::<Vec<InlineKeyboardButton>>::new());
-        try_edit_message(
-            &bot,
-            chat_id,
-            MessageId(last_message_id),
-            archived_text,
-            markup,
-        )
-        .await;
+        try_delete_message(&bot, chat_id, MessageId(last_message_id)).await;
+        bot.send_message(chat_id, archived_text).await?;
 
         let ids: Vec<i64> = done.iter().map(|i| i.id).collect();
         self.db.delete_items(chat_id, &ids).await?;
+
+        bot.send_message(chat_id, CHECKED_ITEMS_ARCHIVED).await?;
 
         let (text, keyboard) = format_list(&remaining);
         let sent = bot
@@ -168,8 +156,6 @@ impl<'a> ListService<'a> {
         self.db
             .update_last_list_message_id(chat_id, sent.id)
             .await?;
-
-        bot.send_message(chat_id, CHECKED_ITEMS_ARCHIVED).await?;
         Ok(())
     }
 

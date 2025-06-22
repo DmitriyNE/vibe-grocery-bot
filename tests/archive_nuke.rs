@@ -1,5 +1,5 @@
 use shopbot::tests::util::init_test_db;
-use shopbot::{ListService, LIST_ARCHIVED, LIST_NUKED};
+use shopbot::{ListService, LIST_NUKED};
 use teloxide::{
     prelude::*,
     types::{Message, MessageId},
@@ -11,7 +11,7 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 async fn archive_clears_data_and_sends_confirmation() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
-        .and(path("/botTEST/EditMessageText"))
+        .and(path("/botTEST/DeleteMessage"))
         .respond_with(
             ResponseTemplate::new(200)
                 .set_body_raw(r#"{"ok":true,"result":true}"#, "application/json"),
@@ -22,10 +22,10 @@ async fn archive_clears_data_and_sends_confirmation() {
     Mock::given(method("POST"))
         .and(path("/botTEST/SendMessage"))
         .respond_with(ResponseTemplate::new(200).set_body_raw(
-            format!(r#"{{"ok":true,"result":{{"message_id":1,"date":0,"chat":{{"id":1,"type":"private"}},"text":"{}"}}}}"#, LIST_ARCHIVED),
+            r#"{"ok":true,"result":{"message_id":2,"date":0,"chat":{"id":1,"type":"private"},"text":"archived"}}"#,
             "application/json",
         ))
-        .expect(1)
+        .expect(2)
         .mount(&server)
         .await;
 

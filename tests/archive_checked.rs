@@ -8,7 +8,7 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 async fn archive_checked_archives_only_done() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
-        .and(path("/botTEST/EditMessageText"))
+        .and(path("/botTEST/DeleteMessage"))
         .respond_with(
             ResponseTemplate::new(200)
                 .set_body_raw(r#"{"ok":true,"result":true}"#, "application/json"),
@@ -19,10 +19,10 @@ async fn archive_checked_archives_only_done() {
     Mock::given(method("POST"))
         .and(path("/botTEST/SendMessage"))
         .respond_with(ResponseTemplate::new(200).set_body_raw(
-            r#"{"ok":true,"result":{"message_id":42,"date":0,"chat":{"id":1,"type":"private"},"text":"t"}}"#,
+            r#"{"ok":true,"result":{"message_id":1,"date":0,"chat":{"id":1,"type":"private"},"text":"archived"}}"#,
             "application/json",
         ))
-        .expect(2)
+        .expect(3)
         .mount(&server)
         .await;
 
