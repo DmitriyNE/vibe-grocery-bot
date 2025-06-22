@@ -14,6 +14,11 @@ pub enum Command {
     List,
     #[command(description = "finalize and archive the current list, starting a new one.")]
     Archive,
+    #[command(
+        rename = "done",
+        description = "archive only checked items and keep the rest."
+    )]
+    ArchiveDone,
     #[command(description = "show a temporary panel to delete items from the list.")]
     Delete,
     #[command(description = "send the list as plain text for copying.")]

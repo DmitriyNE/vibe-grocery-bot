@@ -92,6 +92,9 @@ pub async fn run() -> Result<()> {
                             Command::Start | Command::Help => help(bot, msg).await?,
                             Command::List => service.send_list(bot, msg.chat.id).await?,
                             Command::Archive => service.archive(bot, msg.chat.id).await?,
+                            Command::ArchiveDone => {
+                                service.archive_checked(bot, msg.chat.id).await?
+                            }
                             Command::Delete => {
                                 enter_delete_mode(bot, msg, &db, delete_after_timeout).await?
                             }

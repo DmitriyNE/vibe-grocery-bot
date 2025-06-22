@@ -7,8 +7,8 @@ use teloxide::{
 use super::list::{format_list, format_plain_list};
 use crate::db::Database;
 use crate::messages::{
-    ARCHIVED_LIST_HEADER, LIST_ARCHIVED, LIST_EMPTY, LIST_EMPTY_ADD_ITEM, LIST_NOW_EMPTY,
-    LIST_NUKED, NO_ACTIVE_LIST_TO_ARCHIVE,
+    ARCHIVED_LIST_HEADER, CHECKED_ITEMS_ARCHIVED, LIST_ARCHIVED, LIST_EMPTY, LIST_EMPTY_ADD_ITEM,
+    LIST_NOW_EMPTY, LIST_NUKED, NO_ACTIVE_LIST_TO_ARCHIVE, NO_CHECKED_ITEMS_TO_ARCHIVE,
 };
 use crate::utils::{try_delete_message, try_edit_message};
 
@@ -107,6 +107,69 @@ impl<'a> ListService<'a> {
         self.db.clear_last_list_message_id(chat_id).await?;
 
         bot.send_message(chat_id, LIST_ARCHIVED).await?;
+        Ok(())
+    }
+
+    pub async fn archive_checked(&self, bot: Bot, chat_id: ChatId) -> Result<()> {
+        let last_message_id = match self.db.get_last_list_message_id(chat_id).await? {
+            Some(id) => id,
+            None => {
+                bot.send_message(chat_id, NO_ACTIVE_LIST_TO_ARCHIVE).await?;
+                return Ok(());
+            }
+        };
+
+        let items = self.db.list_items(chat_id).await?;
+        if items.is_empty() {
+            bot.send_message(chat_id, NO_ACTIVE_LIST_TO_ARCHIVE).await?;
+            return Ok(());
+        }
+
+        let (done, remaining): (Vec<_>, Vec<_>) = items.into_iter().partition(|i| i.done);
+
+        if done.is_empty() {
+            bot.send_message(chat_id, NO_CHECKED_ITEMS_TO_ARCHIVE)
+                .await?;
+            return Ok(());
+        }
+
+        if remaining.is_empty() {
+            self.archive(bot, chat_id).await?;
+            return Ok(());
+        }
+
+        tracing::debug!(
+            chat_id = chat_id.0,
+            done = done.len(),
+            remaining = remaining.len(),
+            "Archiving checked items"
+        );
+
+        let (archived_text, _) = format_list(&done);
+        let archived_text = format!("{ARCHIVED_LIST_HEADER}\n{}", archived_text);
+        let markup = InlineKeyboardMarkup::new(Vec::<Vec<InlineKeyboardButton>>::new());
+        try_edit_message(
+            &bot,
+            chat_id,
+            MessageId(last_message_id),
+            archived_text,
+            markup,
+        )
+        .await;
+
+        let ids: Vec<i64> = done.iter().map(|i| i.id).collect();
+        self.db.delete_items(chat_id, &ids).await?;
+
+        let (text, keyboard) = format_list(&remaining);
+        let sent = bot
+            .send_message(chat_id, text)
+            .reply_markup(keyboard)
+            .await?;
+        self.db
+            .update_last_list_message_id(chat_id, sent.id)
+            .await?;
+
+        bot.send_message(chat_id, CHECKED_ITEMS_ARCHIVED).await?;
         Ok(())
     }
 

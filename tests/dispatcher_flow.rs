@@ -10,6 +10,8 @@ enum Command {
     Help,
     List,
     Archive,
+    #[command(rename = "done")]
+    ArchiveDone,
     Delete,
     Share,
     Nuke,
@@ -60,6 +62,9 @@ async fn dispatcher_add_then_list() {
                             Command::Start | Command::Help => shopbot::help(bot, msg).await?,
                             Command::List => service.send_list(bot, msg.chat.id).await?,
                             Command::Archive => service.archive(bot, msg.chat.id).await?,
+                            Command::ArchiveDone => {
+                                service.archive_checked(bot, msg.chat.id).await?
+                            }
                             Command::Delete => {
                                 shopbot::enter_delete_mode(bot, msg, &db, delete_after_timeout)
                                     .await?
