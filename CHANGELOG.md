@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+1. Add token issuance, listing, and revocation commands per chat.
 
 ## [0.4.0] - 2025-06-22
 1. Add index on `items.chat_id` to speed up queries.
@@ -49,4 +50,3 @@ All notable changes to this project will be documented in this file.
 9. `/parse` uses GPT to parse a message into items.
 10. Optional voice message parsing via OpenAI speech-to-text.
 11. Configurable speech model via `OPENAI_STT_MODEL` in `fly.toml`.
-

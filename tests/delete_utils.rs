@@ -1,3 +1,4 @@
+use reqwest::Client;
 use shopbot::delete_after;
 use teloxide::{prelude::*, types::MessageId};
 use wiremock::matchers::{method, path};
@@ -16,7 +17,9 @@ async fn test_delete_after_sends_request() {
         .mount(&server)
         .await;
 
-    let bot = Bot::new("TEST").set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
+    let client = Client::builder().no_proxy().build().unwrap();
+    let bot =
+        Bot::with_client("TEST", client).set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
     let handle = delete_after(bot, ChatId(1), MessageId(2), 0);
     handle.await.unwrap();
     server.verify().await;

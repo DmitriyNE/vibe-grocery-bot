@@ -21,7 +21,7 @@ pub use db::Item;
 pub use handlers::{
     add_items_from_parsed_text, add_items_from_photo, add_items_from_text, add_items_from_voice,
     callback_handler, enter_delete_mode, format_delete_list, format_list, format_plain_list, help,
-    insert_items, show_system_info, ListService,
+    insert_items, issue_token, list_tokens, revoke_token, show_system_info, ListService,
 };
 pub use messages::*;
 pub use system_info::get_system_info;
@@ -104,6 +104,11 @@ pub async fn run() -> Result<()> {
                                 add_items_from_parsed_text(bot, msg, db, ai_config).await?
                             }
                             Command::Info => show_system_info(bot, msg).await?,
+                            Command::Token => issue_token(bot, msg, db).await?,
+                            Command::Tokens => list_tokens(bot, msg, db).await?,
+                            Command::RevokeToken(token) => {
+                                revoke_token(bot, msg, db, token).await?
+                            }
                         }
                         Ok(())
                     },

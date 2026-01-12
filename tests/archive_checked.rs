@@ -1,3 +1,4 @@
+use reqwest::Client;
 use shopbot::tests::util::init_test_db;
 use shopbot::{ListService, NO_CHECKED_ITEMS_TO_ARCHIVE};
 use teloxide::{prelude::*, types::MessageId};
@@ -26,7 +27,9 @@ async fn archive_checked_archives_only_done() {
         .mount(&server)
         .await;
 
-    let bot = Bot::new("TEST").set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
+    let client = Client::builder().no_proxy().build().unwrap();
+    let bot =
+        Bot::with_client("TEST", client).set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
     let db = init_test_db().await;
     let chat = ChatId(1);
     db.add_item(chat, "Milk").await.unwrap();
@@ -61,7 +64,9 @@ async fn archive_checked_none_done() {
         .mount(&server)
         .await;
 
-    let bot = Bot::new("TEST").set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
+    let client = Client::builder().no_proxy().build().unwrap();
+    let bot =
+        Bot::with_client("TEST", client).set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
     let db = init_test_db().await;
     let chat = ChatId(1);
     db.add_item(chat, "Milk").await.unwrap();
