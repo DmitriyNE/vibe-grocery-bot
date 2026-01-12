@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 1. Add token issuance, listing, and revocation commands per chat.
 2. Add a token-authenticated API endpoint for fetching list items.
+3. Add token-authenticated API endpoints for list mutations (add, toggle, delete, archive, nuke, done).
 
 ## [0.4.0] - 2025-06-22
 1. Add index on `items.chat_id` to speed up queries.
