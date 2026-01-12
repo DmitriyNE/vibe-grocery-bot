@@ -2,6 +2,7 @@ use anyhow::Result;
 use teloxide::prelude::*;
 
 pub mod ai;
+mod api;
 mod commands;
 mod config;
 pub mod db;
@@ -61,6 +62,16 @@ pub async fn run() -> Result<()> {
     tracing::info!("Database connection successful.");
 
     sqlx::migrate!("./migrations").run(&*db).await?;
+
+    let api_addr = config.api_bind_addr.clone();
+    let api_listener = tokio::net::TcpListener::bind(&api_addr).await?;
+    let api_router = api::router(db.clone());
+    tracing::info!(api_addr = %api_addr, "API server listening");
+    tokio::spawn(async move {
+        if let Err(err) = axum::serve(api_listener, api_router).await {
+            tracing::error!(error = %err, "API server stopped");
+        }
+    });
 
     // --- Command Enum ---
     // defined in the commands module

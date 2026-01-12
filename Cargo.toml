@@ -21,8 +21,10 @@ git-version = "0.3"
 unicode-segmentation = "1.12"
 chrono = "0.4"
 rand = "0.8"
+axum = "0.7"
 
 [dev-dependencies]
 proptest = "1.7"
 wiremock = "0.6"
 serial_test = "3"
+tower = { version = "0.5", features = ["util"] }
