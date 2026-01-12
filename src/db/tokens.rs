@@ -53,6 +53,28 @@ impl Database {
         .await?;
         Ok(result.rows_affected() > 0)
     }
+
+    pub async fn use_token(&self, token: &str, used_at: i64) -> Result<Option<ChatId>> {
+        let chat_id: Option<i64> =
+            sqlx::query_scalar("SELECT chat_id FROM tokens WHERE token = ? AND revoked_at IS NULL")
+                .bind(token)
+                .fetch_optional(self.pool())
+                .await?;
+
+        if let Some(chat_id) = chat_id {
+            sqlx::query(
+                "UPDATE tokens SET last_used_at = ? WHERE token = ? AND revoked_at IS NULL",
+            )
+            .bind(used_at)
+            .bind(token)
+            .execute(self.pool())
+            .await?;
+            tracing::debug!(chat_id, used_at, "Updated token last_used_at");
+            return Ok(Some(ChatId(chat_id)));
+        }
+
+        Ok(None)
+    }
 }
 
 #[cfg(test)]
@@ -87,6 +109,21 @@ mod tests {
 
         let tokens = db.list_tokens(chat_id).await?;
         assert_eq!(tokens[0].revoked_at, Some(456));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn token_use_updates_last_used() -> Result<()> {
+        let db = init_test_db().await;
+        let chat_id = ChatId(9);
+        db.create_token(chat_id, "token-use", 123).await?;
+
+        let used_at = 555;
+        let resolved = db.use_token("token-use", used_at).await?;
+        assert_eq!(resolved, Some(chat_id));
+
+        let tokens = db.list_tokens(chat_id).await?;
+        assert_eq!(tokens[0].last_used_at, Some(used_at));
         Ok(())
     }
 
