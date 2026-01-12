@@ -1,3 +1,4 @@
+use reqwest::Client;
 use shopbot::tests::util::init_test_db;
 use shopbot::{ListService, LIST_NUKED};
 use teloxide::{
@@ -29,7 +30,9 @@ async fn archive_clears_data_and_sends_confirmation() {
         .mount(&server)
         .await;
 
-    let bot = Bot::new("TEST").set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
+    let client = Client::builder().no_proxy().build().unwrap();
+    let bot =
+        Bot::with_client("TEST", client).set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
     let db = init_test_db().await;
     let chat = ChatId(1);
     db.add_item(chat, "Milk").await.unwrap();
@@ -71,7 +74,9 @@ async fn nuke_clears_data_and_sends_confirmation() {
         .mount(&server)
         .await;
 
-    let bot = Bot::new("TEST").set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
+    let client = Client::builder().no_proxy().build().unwrap();
+    let bot =
+        Bot::with_client("TEST", client).set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
     let db = init_test_db().await;
     let chat = ChatId(1);
     db.add_item(chat, "Milk").await.unwrap();

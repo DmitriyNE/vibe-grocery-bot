@@ -81,7 +81,7 @@ pub async fn interpret_voice_command_inner(
 
     debug!(url, "sending chat completion request");
 
-    let client = reqwest::Client::new();
+    let client = crate::ai::common::client_for_url(url)?;
     let builder = client.post(url).json(&body);
     let resp = crate::ai::common::send_openai_request(api_key, builder).await?;
 

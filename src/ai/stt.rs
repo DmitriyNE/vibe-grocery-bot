@@ -30,7 +30,7 @@ async fn transcribe_audio_inner(
 
     debug!(model, prompt=?prompt, url, "sending transcription request");
 
-    let client = reqwest::Client::new();
+    let client = crate::ai::common::client_for_url(url)?;
     let builder = client.post(url).multipart(form);
     let resp = crate::ai::common::send_openai_request(api_key, builder).await?;
 

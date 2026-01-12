@@ -235,9 +235,10 @@ pub async fn callback_handler(bot: Bot, q: CallbackQuery, db: Database) -> Resul
 mod tests {
     use super::*;
     use crate::tests::util::init_test_db;
+    use reqwest::Client;
     use teloxide::types::{ChatId, MaybeInaccessibleMessage, MessageId, UserId};
     use wiremock::{
-        matchers::{method, path},
+        matchers::{method, path, path_regex},
         Mock, MockServer, ResponseTemplate,
     };
 
@@ -245,7 +246,7 @@ mod tests {
     async fn cleanup_previous_session_deletes_messages() {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
-            .and(path("/botTEST/DeleteMessage"))
+            .and(path_regex(r"^/botTEST/[Dd]eleteMessage$"))
             .respond_with(
                 ResponseTemplate::new(200)
                     .set_body_raw(r#"{"ok":true,"result":true}"#, "application/json"),
@@ -254,7 +255,9 @@ mod tests {
             .mount(&server)
             .await;
 
-        let bot = Bot::new("TEST").set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
+        let client = Client::builder().no_proxy().build().unwrap();
+        let bot = Bot::with_client("TEST", client)
+            .set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
         let db = init_test_db().await;
         let user = UserId(1);
         db.init_delete_session(user.0 as i64, ChatId(1))
@@ -284,7 +287,9 @@ mod tests {
             .mount(&server)
             .await;
 
-        let bot = Bot::new("TEST").set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
+        let client = Client::builder().no_proxy().build().unwrap();
+        let bot = Bot::with_client("TEST", client)
+            .set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
         let db = init_test_db().await;
         let chat = ChatId(1);
         db.add_item(chat, "Milk").await.unwrap();

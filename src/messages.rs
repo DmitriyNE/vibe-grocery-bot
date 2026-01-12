@@ -14,7 +14,10 @@ pub const HELP_TEXT: &str =
              /share - Send the list as plain text for copying.\n\
              /nuke - Completely delete the current list.\n\
              /parse - Parse this message into items via GPT.\n\
-             /info - Show system information.";
+             /info - Show system information.\n\
+             /token - Issue a new token for this list.\n\
+             /tokens - List issued tokens for this list.\n\
+             /revoke_token <token> - Revoke a token.";
 
 pub const GPT_PARSING_DISABLED: &str = "GPT parsing is disabled.";
 
@@ -28,6 +31,12 @@ pub const LIST_ARCHIVED: &str = "List archived! Send a message to start a new on
 pub const LIST_NUKED: &str = "The active list has been nuked.";
 pub const CHECKED_ITEMS_ARCHIVED: &str = "Checked items archived!";
 pub const NO_CHECKED_ITEMS_TO_ARCHIVE: &str = "There are no checked items to archive.";
+
+pub const TOKEN_ISSUED: &str = "Here is your new token:";
+pub const TOKENS_EMPTY: &str = "No tokens have been issued for this list yet.";
+pub const TOKEN_REVOKE_USAGE: &str = "Usage: /revoke_token <token>";
+pub const TOKEN_REVOKED: &str = "Token revoked.";
+pub const TOKEN_NOT_FOUND: &str = "Token not found or already revoked.";
 
 pub const DELETE_SELECT_PROMPT: &str = "Select items to delete, then tap 'Done Deleting'.";
 pub const DELETE_DONE_LABEL: &str = "🗑️ Done Deleting";
