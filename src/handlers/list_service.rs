@@ -5,7 +5,7 @@ use teloxide::{
 };
 
 use super::list::{format_list, format_plain_list};
-use crate::db::Database;
+use crate::db::{Database, Item};
 use crate::messages::{
     ARCHIVED_LIST_HEADER, CHECKED_ITEMS_ARCHIVED, LIST_ARCHIVED, LIST_EMPTY, LIST_EMPTY_ADD_ITEM,
     LIST_NOW_EMPTY, LIST_NUKED, NO_ACTIVE_LIST_TO_ARCHIVE, NO_CHECKED_ITEMS_TO_ARCHIVE,
@@ -76,24 +76,17 @@ impl<'a> ListService<'a> {
     }
 
     pub async fn archive(&self, bot: Bot, chat_id: ChatId) -> Result<()> {
-        let last_message_id = match self.db.get_last_list_message_id(chat_id).await? {
-            Some(id) => id,
-            None => {
-                bot.send_message(chat_id, NO_ACTIVE_LIST_TO_ARCHIVE).await?;
-                return Ok(());
-            }
-        };
-
-        let items = self.db.list_items(chat_id).await?;
-        if items.is_empty() {
-            bot.send_message(chat_id, NO_ACTIVE_LIST_TO_ARCHIVE).await?;
+        let Some((last_message_id, items)) = self
+            .load_active_items(&bot, chat_id, NO_ACTIVE_LIST_TO_ARCHIVE)
+            .await?
+        else {
             return Ok(());
-        }
+        };
 
         let (final_text, _) = format_list(&items);
         let archived_text = format!("{ARCHIVED_LIST_HEADER}\n{}", final_text);
 
-        try_delete_message(&bot, chat_id, MessageId(last_message_id)).await;
+        try_delete_message(&bot, chat_id, last_message_id).await;
         bot.send_message(chat_id, archived_text).await?;
 
         self.db.delete_all_items(chat_id).await?;
@@ -104,19 +97,12 @@ impl<'a> ListService<'a> {
     }
 
     pub async fn archive_checked(&self, bot: Bot, chat_id: ChatId) -> Result<()> {
-        let last_message_id = match self.db.get_last_list_message_id(chat_id).await? {
-            Some(id) => id,
-            None => {
-                bot.send_message(chat_id, NO_ACTIVE_LIST_TO_ARCHIVE).await?;
-                return Ok(());
-            }
-        };
-
-        let items = self.db.list_items(chat_id).await?;
-        if items.is_empty() {
-            bot.send_message(chat_id, NO_ACTIVE_LIST_TO_ARCHIVE).await?;
+        let Some((last_message_id, items)) = self
+            .load_active_items(&bot, chat_id, NO_ACTIVE_LIST_TO_ARCHIVE)
+            .await?
+        else {
             return Ok(());
-        }
+        };
 
         let (done, remaining): (Vec<_>, Vec<_>) = items.into_iter().partition(|i| i.done);
 
@@ -140,7 +126,7 @@ impl<'a> ListService<'a> {
 
         let (archived_text, _) = format_list(&done);
         let archived_text = format!("{ARCHIVED_LIST_HEADER}\n{}", archived_text);
-        try_delete_message(&bot, chat_id, MessageId(last_message_id)).await;
+        try_delete_message(&bot, chat_id, last_message_id).await;
         bot.send_message(chat_id, archived_text).await?;
 
         let ids: Vec<i64> = done.iter().map(|i| i.id).collect();
@@ -174,5 +160,28 @@ impl<'a> ListService<'a> {
             delete_after_timeout,
         ));
         Ok(())
+    }
+
+    async fn load_active_items(
+        &self,
+        bot: &Bot,
+        chat_id: ChatId,
+        empty_message: &str,
+    ) -> Result<Option<(MessageId, Vec<Item>)>> {
+        let last_message_id = match self.db.get_last_list_message_id(chat_id).await? {
+            Some(id) => MessageId(id),
+            None => {
+                bot.send_message(chat_id, empty_message).await?;
+                return Ok(None);
+            }
+        };
+
+        let items = self.db.list_items(chat_id).await?;
+        if items.is_empty() {
+            bot.send_message(chat_id, empty_message).await?;
+            return Ok(None);
+        }
+
+        Ok(Some((last_message_id, items)))
     }
 }
