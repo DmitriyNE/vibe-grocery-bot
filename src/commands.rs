@@ -29,8 +29,11 @@ pub enum Command {
     Parse,
     #[command(description = "show system information.")]
     Info,
-    #[command(description = "issue a new token for this list.")]
-    Token,
+    #[command(
+        rename = "create_token",
+        description = "issue a new token for this list (optionally named)."
+    )]
+    CreateToken(String),
     #[command(description = "list issued tokens for this list.")]
     Tokens,
     #[command(rename = "revoke_token", description = "revoke a token.")]

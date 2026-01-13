@@ -587,7 +587,9 @@ mod tests {
     async fn list_returns_items() {
         let db = init_test_db().await;
         let chat_id = ChatId(10);
-        db.create_token(chat_id, "token-123", 1).await.unwrap();
+        db.create_token(chat_id, "token-123", None, None, None, 1)
+            .await
+            .unwrap();
         db.add_item(chat_id, "Milk").await.unwrap();
 
         let app = router(
@@ -623,7 +625,9 @@ mod tests {
     async fn add_toggle_delete_flow() {
         let db = init_test_db().await;
         let chat_id = ChatId(11);
-        db.create_token(chat_id, "token-add", 1).await.unwrap();
+        db.create_token(chat_id, "token-add", None, None, None, 1)
+            .await
+            .unwrap();
         let app = router(
             db.clone(),
             ApiConfig {
@@ -697,7 +701,9 @@ mod tests {
     async fn done_archives_checked_items() {
         let db = init_test_db().await;
         let chat_id = ChatId(12);
-        db.create_token(chat_id, "token-done", 1).await.unwrap();
+        db.create_token(chat_id, "token-done", None, None, None, 1)
+            .await
+            .unwrap();
         db.add_item(chat_id, "Tea").await.unwrap();
         db.add_item(chat_id, "Sugar").await.unwrap();
         let items = db.list_items(chat_id).await.unwrap();
@@ -732,7 +738,9 @@ mod tests {
     async fn archive_and_nuke_clear_items() {
         let db = init_test_db().await;
         let chat_id = ChatId(13);
-        db.create_token(chat_id, "token-archive", 1).await.unwrap();
+        db.create_token(chat_id, "token-archive", None, None, None, 1)
+            .await
+            .unwrap();
         db.add_item(chat_id, "Bread").await.unwrap();
         let app = router(
             db.clone(),
@@ -776,7 +784,9 @@ mod tests {
     async fn list_rejects_invalid_token() {
         let db = init_test_db().await;
         let chat_id = ChatId(7);
-        db.create_token(chat_id, "token-abc", 1).await.unwrap();
+        db.create_token(chat_id, "token-abc", None, None, None, 1)
+            .await
+            .unwrap();
 
         let app = router(
             db.clone(),
@@ -804,7 +814,9 @@ mod tests {
     async fn list_allows_empty_response() {
         let db = init_test_db().await;
         let chat_id = ChatId(42);
-        db.create_token(chat_id, "token-empty", 1).await.unwrap();
+        db.create_token(chat_id, "token-empty", None, None, None, 1)
+            .await
+            .unwrap();
 
         let app = router(
             db,

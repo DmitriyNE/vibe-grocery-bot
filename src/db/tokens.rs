@@ -7,17 +7,40 @@ pub struct TokenRecord {
     pub id: i64,
     pub chat_id: i64,
     pub token: String,
+    pub name: Option<String>,
+    pub issuer_user_id: Option<i64>,
+    pub issuer_name: Option<String>,
     pub issued_at: i64,
     pub last_used_at: Option<i64>,
     pub revoked_at: Option<i64>,
 }
 
 impl Database {
-    pub async fn create_token(&self, chat_id: ChatId, token: &str, issued_at: i64) -> Result<()> {
-        tracing::debug!(chat_id = chat_id.0, issued_at, "Creating token for chat");
-        sqlx::query("INSERT INTO tokens (chat_id, token, issued_at) VALUES (?, ?, ?)")
+    pub async fn create_token(
+        &self,
+        chat_id: ChatId,
+        token: &str,
+        name: Option<&str>,
+        issuer_user_id: Option<i64>,
+        issuer_name: Option<&str>,
+        issued_at: i64,
+    ) -> Result<()> {
+        tracing::debug!(
+            chat_id = chat_id.0,
+            issued_at,
+            name,
+            issuer_user_id,
+            issuer_name,
+            "Creating token for chat"
+        );
+        sqlx::query(
+            "INSERT INTO tokens (chat_id, token, name, issuer_user_id, issuer_name, issued_at) VALUES (?, ?, ?, ?, ?, ?)",
+        )
             .bind(chat_id.0)
             .bind(token)
+            .bind(name)
+            .bind(issuer_user_id)
+            .bind(issuer_name)
             .bind(issued_at)
             .execute(self.pool())
             .await?;
@@ -27,7 +50,7 @@ impl Database {
     pub async fn list_tokens(&self, chat_id: ChatId) -> Result<Vec<TokenRecord>> {
         tracing::trace!(chat_id = chat_id.0, "Listing tokens");
         sqlx::query_as(
-            "SELECT id, chat_id, token, issued_at, last_used_at, revoked_at \
+            "SELECT id, chat_id, token, name, issuer_user_id, issuer_name, issued_at, last_used_at, revoked_at \
              FROM tokens WHERE chat_id = ? ORDER BY issued_at DESC, id DESC",
         )
         .bind(chat_id.0)
@@ -88,8 +111,10 @@ mod tests {
     async fn token_create_and_list() -> Result<()> {
         let db = init_test_db().await;
         let chat_id = ChatId(42);
-        db.create_token(chat_id, "token-a", 100).await?;
-        db.create_token(chat_id, "token-b", 200).await?;
+        db.create_token(chat_id, "token-a", None, None, None, 100)
+            .await?;
+        db.create_token(chat_id, "token-b", None, None, None, 200)
+            .await?;
 
         let tokens = db.list_tokens(chat_id).await?;
         assert_eq!(tokens.len(), 2);
@@ -102,7 +127,8 @@ mod tests {
     async fn token_revoke() -> Result<()> {
         let db = init_test_db().await;
         let chat_id = ChatId(7);
-        db.create_token(chat_id, "token-x", 123).await?;
+        db.create_token(chat_id, "token-x", None, None, None, 123)
+            .await?;
 
         let revoked = db.revoke_token(chat_id, "token-x", 456).await?;
         assert!(revoked);
@@ -116,7 +142,8 @@ mod tests {
     async fn token_use_updates_last_used() -> Result<()> {
         let db = init_test_db().await;
         let chat_id = ChatId(9);
-        db.create_token(chat_id, "token-use", 123).await?;
+        db.create_token(chat_id, "token-use", None, None, None, 123)
+            .await?;
 
         let used_at = 555;
         let resolved = db.use_token("token-use", used_at).await?;
@@ -136,7 +163,9 @@ mod tests {
                 let chat_id = ChatId(1);
                 for (idx, issued_at) in issued_at_values.iter().enumerate() {
                     let token = format!("token-{idx}");
-                    db.create_token(chat_id, &token, *issued_at).await.unwrap();
+                    db.create_token(chat_id, &token, None, None, None, *issued_at)
+                        .await
+                        .unwrap();
                 }
 
                 let mut expected: Vec<(i64, usize)> = issued_at_values
@@ -157,5 +186,26 @@ mod tests {
                 Ok(())
             })?;
         }
+    }
+
+    #[tokio::test]
+    async fn token_create_stores_metadata() -> Result<()> {
+        let db = init_test_db().await;
+        let chat_id = ChatId(12);
+        db.create_token(
+            chat_id,
+            "token-meta",
+            Some("Ops"),
+            Some(777),
+            Some("On-call"),
+            321,
+        )
+        .await?;
+
+        let tokens = db.list_tokens(chat_id).await?;
+        assert_eq!(tokens[0].name.as_deref(), Some("Ops"));
+        assert_eq!(tokens[0].issuer_user_id, Some(777));
+        assert_eq!(tokens[0].issuer_name.as_deref(), Some("On-call"));
+        Ok(())
     }
 }

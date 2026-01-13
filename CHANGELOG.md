@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 5. Add structured API logging with request IDs and token identifiers.
 6. Document API usage and token workflow in the README.
 7. Parse leading "-" and "*" markdown bullets when extracting items from text.
+8. Add optional token names, store token issuer IDs and names, and rename the token command to `/create_token`.
 
 ## [0.4.0] - 2025-06-22
 1. Add index on `items.chat_id` to speed up queries.
