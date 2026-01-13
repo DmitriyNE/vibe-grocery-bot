@@ -35,14 +35,7 @@ impl<'a> ListService<'a> {
             return Ok(());
         }
 
-        let (text, keyboard) = format_list(&items);
-        let sent = bot
-            .send_message(chat_id, text)
-            .reply_markup(keyboard)
-            .await?;
-        self.db
-            .update_last_list_message_id(chat_id, sent.id)
-            .await?;
+        self.send_list_message(bot, chat_id, &items).await?;
         Ok(())
     }
 
@@ -134,14 +127,7 @@ impl<'a> ListService<'a> {
 
         bot.send_message(chat_id, CHECKED_ITEMS_ARCHIVED).await?;
 
-        let (text, keyboard) = format_list(&remaining);
-        let sent = bot
-            .send_message(chat_id, text)
-            .reply_markup(keyboard)
-            .await?;
-        self.db
-            .update_last_list_message_id(chat_id, sent.id)
-            .await?;
+        self.send_list_message(bot, chat_id, &remaining).await?;
         Ok(())
     }
 
@@ -183,5 +169,17 @@ impl<'a> ListService<'a> {
         }
 
         Ok(Some((last_message_id, items)))
+    }
+
+    async fn send_list_message(&self, bot: Bot, chat_id: ChatId, items: &[Item]) -> Result<()> {
+        let (text, keyboard) = format_list(items);
+        let sent = bot
+            .send_message(chat_id, text)
+            .reply_markup(keyboard)
+            .await?;
+        self.db
+            .update_last_list_message_id(chat_id, sent.id)
+            .await?;
+        Ok(())
     }
 }
