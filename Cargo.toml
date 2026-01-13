@@ -22,6 +22,7 @@ unicode-segmentation = "1.12"
 chrono = "0.4"
 rand = "0.8"
 axum = "0.7"
+uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
 proptest = "1.7"
