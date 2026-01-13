@@ -20,7 +20,7 @@ base64 = "0.22"
 git-version = "0.3"
 unicode-segmentation = "1.12"
 chrono = "0.4"
-rand = "0.8"
+rand = "0.9"
 axum = "0.8"
 uuid = { version = "1", features = ["v4"] }
 
