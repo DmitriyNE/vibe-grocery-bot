@@ -25,6 +25,27 @@ impl Database {
         Ok(result.rows_affected())
     }
 
+    pub async fn add_items(&self, chat_id: ChatId, items: &[String]) -> Result<()> {
+        self.add_items_count(chat_id, items).await?;
+        Ok(())
+    }
+
+    pub async fn add_items_count(&self, chat_id: ChatId, items: &[String]) -> Result<u64> {
+        if items.is_empty() {
+            return Ok(0);
+        }
+
+        tracing::trace!(chat_id = chat_id.0, count = items.len(), "Adding items");
+        let mut builder =
+            sqlx::QueryBuilder::<sqlx::Sqlite>::new("INSERT INTO items (chat_id, text) ");
+        builder.push_values(items, |mut row, text| {
+            row.push_bind(chat_id.0).push_bind(text);
+        });
+
+        let result = builder.build().execute(self.pool()).await?;
+        Ok(result.rows_affected())
+    }
+
     pub async fn list_items(&self, chat_id: ChatId) -> Result<Vec<Item>> {
         tracing::trace!(chat_id = chat_id.0, "Listing items");
         sqlx::query_as("SELECT id, text, done FROM items WHERE chat_id = ? ORDER BY id")
@@ -103,5 +124,38 @@ impl Database {
 
         let result = builder.build().execute(self.pool()).await?;
         Ok(result.rows_affected())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::util::init_test_db;
+
+    #[tokio::test]
+    async fn add_items_inserts_multiple() {
+        let db = init_test_db().await;
+        let chat = ChatId(1);
+        let items = vec!["Apple".to_string(), "Banana".to_string()];
+
+        let added = db.add_items_count(chat, &items).await.unwrap();
+        assert_eq!(added, 2);
+
+        let stored = db.list_items(chat).await.unwrap();
+        let texts: Vec<_> = stored.into_iter().map(|item| item.text).collect();
+        assert_eq!(texts, vec!["Apple".to_string(), "Banana".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn add_items_handles_empty() {
+        let db = init_test_db().await;
+        let chat = ChatId(1);
+        let items: Vec<String> = Vec::new();
+
+        let added = db.add_items_count(chat, &items).await.unwrap();
+        assert_eq!(added, 0);
+
+        let stored = db.list_items(chat).await.unwrap();
+        assert!(stored.is_empty());
     }
 }

@@ -65,11 +65,8 @@ pub async fn insert_items<I>(bot: Bot, chat_id: ChatId, db: &Database, items: I)
 where
     I: IntoIterator<Item = String>,
 {
-    let mut added = 0usize;
-    for item in items {
-        db.add_item(chat_id, &item).await?;
-        added += 1;
-    }
+    let items: Vec<String> = items.into_iter().collect();
+    let added = db.add_items_count(chat_id, &items).await? as usize;
 
     if added > 0 {
         tracing::debug!(chat_id = chat_id.0, added, "Inserted items");
