@@ -18,7 +18,8 @@ fn now_timestamp() -> i64 {
 
 fn generate_token() -> String {
     let mut bytes = [0u8; 32];
-    OsRng.try_fill_bytes(&mut bytes)
+    OsRng
+        .try_fill_bytes(&mut bytes)
         .expect("OS RNG should be available to issue tokens");
     URL_SAFE_NO_PAD.encode(bytes)
 }
