@@ -2,7 +2,7 @@ use anyhow::Result;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 use rand::rngs::OsRng;
-use rand::RngCore;
+use rand::TryRngCore;
 use teloxide::prelude::*;
 use teloxide::types::{ParseMode, User};
 use teloxide::utils::html::escape;
@@ -18,7 +18,8 @@ fn now_timestamp() -> i64 {
 
 fn generate_token() -> String {
     let mut bytes = [0u8; 32];
-    OsRng.fill_bytes(&mut bytes);
+    OsRng.try_fill_bytes(&mut bytes)
+        .expect("OS RNG should be available to issue tokens");
     URL_SAFE_NO_PAD.encode(bytes)
 }
 
