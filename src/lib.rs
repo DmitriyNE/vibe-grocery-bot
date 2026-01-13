@@ -122,7 +122,7 @@ pub async fn run() -> Result<()> {
                                 add_items_from_parsed_text(bot, msg, db, ai_config).await?
                             }
                             Command::Info => show_system_info(bot, msg).await?,
-                            Command::Token => issue_token(bot, msg, db).await?,
+                            Command::CreateToken(name) => issue_token(bot, msg, db, name).await?,
                             Command::Tokens => list_tokens(bot, msg, db).await?,
                             Command::RevokeToken(token) => {
                                 revoke_token(bot, msg, db, token).await?

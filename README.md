@@ -63,12 +63,12 @@ The bot exposes a token-authenticated JSON API on `API_BIND_ADDR` (defaults to `
 
 ### Token workflow
 
-1. In the Telegram chat, issue a token with `/token`.
+1. In the Telegram chat, issue a token with `/create_token` (optionally add a name).
 2. Store the token securely (it is only shown once).
 3. Send API requests with `Authorization: Bearer <token>`.
 4. Use `/tokens` to list issued tokens and `/revoke_token <token>` to revoke one.
 
-Each request updates the token's last-used timestamp, and responses include an `x-request-id` header for tracing.
+Each request updates the token's last-used timestamp, and responses include an `x-request-id` header for tracing. Tokens can be optionally named and record the issuing Telegram user ID and display name.
 
 ### Endpoints
 

@@ -4,7 +4,8 @@ use base64::Engine;
 use rand::rngs::OsRng;
 use rand::RngCore;
 use teloxide::prelude::*;
-use teloxide::types::ParseMode;
+use teloxide::types::{ParseMode, User};
+use teloxide::utils::html::escape;
 
 use crate::db::{Database, TokenRecord};
 use crate::messages::{
@@ -44,24 +45,75 @@ fn format_token_list(tokens: &[TokenRecord]) -> String {
         let issued = format_timestamp(token.issued_at);
         let last_used = format_optional_timestamp(token.last_used_at, "never");
         let revoked = format_optional_timestamp(token.revoked_at, "not revoked");
+        let name = token
+            .name
+            .as_deref()
+            .map(|value| format!("name: {}\n", escape(value)))
+            .unwrap_or_default();
+        let issuer = match (token.issuer_name.as_deref(), token.issuer_user_id) {
+            (Some(name), Some(user_id)) => {
+                format!("issued by: {} ({user_id})\n", escape(name))
+            }
+            (Some(name), None) => format!("issued by: {}\n", escape(name)),
+            (None, Some(user_id)) => format!("issued by: {user_id}\n"),
+            (None, None) => String::new(),
+        };
         lines.push(format!(
-            "<code>{}</code>\nissued: {issued}\nlast used: {last_used}\nrevoked: {revoked}",
-            token.token
+            "<code>{}</code>\n{name}{issuer}issued: {issued}\nlast used: {last_used}\nrevoked: {revoked}",
+            token.token,
         ));
     }
     format!("<b>Tokens</b>\n\n{}", lines.join("\n\n"))
 }
 
-pub async fn issue_token(bot: Bot, msg: Message, db: Database) -> Result<()> {
+fn parse_token_name(text: &str) -> Option<String> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
+}
+
+fn issuer_display_name(user: &User) -> String {
+    if let Some(username) = user.username.as_deref() {
+        format!("@{username}")
+    } else if let Some(last_name) = user.last_name.as_deref() {
+        format!("{} {}", user.first_name, last_name)
+    } else {
+        user.first_name.clone()
+    }
+}
+
+pub async fn issue_token(
+    bot: Bot,
+    msg: Message,
+    db: Database,
+    requested_name: String,
+) -> Result<()> {
     let token = generate_token();
     let issued_at = now_timestamp();
     let preview = token_preview(&token);
+    let name = parse_token_name(&requested_name);
+    let issuer_user_id = msg.from.as_ref().map(|user| user.id.0 as i64);
+    let issuer_name = msg.from.as_ref().map(issuer_display_name);
     tracing::debug!(
         chat_id = msg.chat.id.0,
         token_preview = %preview,
+        name = name.as_deref(),
+        issuer_user_id,
+        issuer_name = issuer_name.as_deref(),
         "Issuing token"
     );
-    db.create_token(msg.chat.id, &token, issued_at).await?;
+    db.create_token(
+        msg.chat.id,
+        &token,
+        name.as_deref(),
+        issuer_user_id,
+        issuer_name.as_deref(),
+        issued_at,
+    )
+    .await?;
 
     let response = format!("{TOKEN_ISSUED}\n<code>{token}</code>");
     bot.send_message(msg.chat.id, response)

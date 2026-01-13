@@ -15,7 +15,7 @@ pub const HELP_TEXT: &str =
              /nuke - Completely delete the current list.\n\
              /parse - Parse this message into items via GPT.\n\
              /info - Show system information.\n\
-             /token - Issue a new token for this list.\n\
+             /create_token [name] - Issue a new token for this list.\n\
              /tokens - List issued tokens for this list.\n\
              /revoke_token <token> - Revoke a token.";
 

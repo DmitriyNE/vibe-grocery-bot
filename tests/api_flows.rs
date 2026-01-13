@@ -10,7 +10,9 @@ use tower::ServiceExt;
 async fn api_add_toggle_delete_flow() {
     let db = init_test_db().await;
     let chat_id = ChatId(70);
-    db.create_token(chat_id, "token-flow", 1).await.unwrap();
+    db.create_token(chat_id, "token-flow", None, None, None, 1)
+        .await
+        .unwrap();
 
     let app = api_router(
         db.clone(),
@@ -83,7 +85,9 @@ async fn api_add_toggle_delete_flow() {
 async fn api_rate_limit_rejects_second_request() {
     let db = init_test_db().await;
     let chat_id = ChatId(71);
-    db.create_token(chat_id, "token-rate", 1).await.unwrap();
+    db.create_token(chat_id, "token-rate", None, None, None, 1)
+        .await
+        .unwrap();
 
     let app = api_router(
         db,
