@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 4. Add configurable API rate limiting and request ID headers.
 5. Add structured API logging with request IDs and token identifiers.
 6. Document API usage and token workflow in the README.
+7. Parse leading "-" and "*" markdown bullets when extracting items from text.
 
 ## [0.4.0] - 2025-06-22
 1. Add index on `items.chat_id` to speed up queries.
