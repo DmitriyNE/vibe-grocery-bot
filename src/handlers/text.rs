@@ -6,8 +6,9 @@ use crate::ai::config::AiConfig;
 use crate::ai::gpt::parse_items_gpt;
 use crate::ai::stt::parse_items;
 use crate::messages::{GPT_PARSING_DISABLED, HELP_TEXT};
-use crate::text_utils::{capitalize_first, parse_item_line};
+use crate::text_utils::parse_item_line;
 
+use super::list::insert_capitalized_items_with_log;
 use super::list::insert_items;
 
 pub async fn help(bot: Bot, msg: Message) -> Result<()> {
@@ -59,15 +60,8 @@ pub async fn add_items_from_parsed_text(
         }
     };
 
-    let items: Vec<String> = items.into_iter().map(|i| capitalize_first(&i)).collect();
-    let added = insert_items(bot, msg.chat.id, &db, items).await?;
-    if added > 0 {
-        tracing::info!(
-            "Added {} item(s) via /parse for chat {}",
-            added,
-            msg.chat.id
-        );
-    }
+    let _added =
+        insert_capitalized_items_with_log(bot, msg.chat.id, &db, items, "via /parse").await?;
 
     Ok(())
 }

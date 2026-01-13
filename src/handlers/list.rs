@@ -1,4 +1,5 @@
 use crate::db::{Database, Item};
+use crate::text_utils::capitalize_first;
 use anyhow::Result;
 use teloxide::{
     prelude::*,
@@ -43,6 +44,16 @@ pub fn format_plain_list(items: &[Item]) -> String {
     text
 }
 
+fn capitalize_items<I>(items: I) -> Vec<String>
+where
+    I: IntoIterator<Item = String>,
+{
+    items
+        .into_iter()
+        .map(|item| capitalize_first(&item))
+        .collect()
+}
+
 pub async fn insert_items<I>(bot: Bot, chat_id: ChatId, db: &Database, items: I) -> Result<usize>
 where
     I: IntoIterator<Item = String>,
@@ -60,4 +71,34 @@ where
         tracing::debug!(chat_id = chat_id.0, "No items inserted");
     }
     Ok(added)
+}
+
+pub async fn insert_capitalized_items_with_log<I>(
+    bot: Bot,
+    chat_id: ChatId,
+    db: &Database,
+    items: I,
+    context: &str,
+) -> Result<usize>
+where
+    I: IntoIterator<Item = String>,
+{
+    let items = capitalize_items(items);
+    let added = insert_items(bot, chat_id, db, items).await?;
+    if added > 0 {
+        tracing::info!(chat_id = chat_id.0, added, context, "Added items");
+    }
+    Ok(added)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::capitalize_items;
+
+    #[test]
+    fn capitalize_items_preserves_sequences() {
+        let items = vec!["apple".to_string(), "Éclair".to_string()];
+        let capitalized = capitalize_items(items);
+        assert_eq!(capitalized, vec!["Apple".to_string(), "Éclair".to_string()]);
+    }
 }

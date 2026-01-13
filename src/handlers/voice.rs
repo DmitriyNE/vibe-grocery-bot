@@ -7,7 +7,7 @@ use crate::ai::config::AiConfig;
 use crate::ai::gpt::{interpret_voice_command, VoiceCommand};
 use crate::ai::stt::{parse_items, transcribe_audio, DEFAULT_PROMPT};
 use crate::messages::VOICE_REMOVED_PREFIX;
-use crate::text_utils::{capitalize_first, normalize_for_match};
+use crate::text_utils::normalize_for_match;
 
 use crate::db::Item;
 
@@ -34,7 +34,7 @@ pub async fn delete_matching_items(
     Ok(deleted)
 }
 
-use super::list::insert_items;
+use super::list::insert_capitalized_items_with_log;
 use super::list_service::ListService;
 
 pub async fn add_items_from_voice(
@@ -80,16 +80,14 @@ pub async fn add_items_from_voice(
             .await
             {
                 Ok(VoiceCommand::Add(items)) => {
-                    let items: Vec<String> =
-                        items.into_iter().map(|i| capitalize_first(&i)).collect();
-                    let added = insert_items(bot.clone(), msg.chat.id, &db, items).await?;
-                    if added > 0 {
-                        tracing::info!(
-                            "Added {} item(s) from voice for chat {}",
-                            added,
-                            msg.chat.id
-                        );
-                    }
+                    let _added = insert_capitalized_items_with_log(
+                        bot.clone(),
+                        msg.chat.id,
+                        &db,
+                        items,
+                        "from voice",
+                    )
+                    .await?;
                 }
                 Ok(VoiceCommand::Delete(items)) => {
                     let deleted =
@@ -111,16 +109,14 @@ pub async fn add_items_from_voice(
                 Err(err) => {
                     tracing::warn!("gpt command failed: {}", err);
                     let items = parse_items(&text);
-                    let items: Vec<String> =
-                        items.into_iter().map(|i| capitalize_first(&i)).collect();
-                    let added = insert_items(bot.clone(), msg.chat.id, &db, items).await?;
-                    if added > 0 {
-                        tracing::info!(
-                            "Added {} item(s) from voice for chat {}",
-                            added,
-                            msg.chat.id
-                        );
-                    }
+                    let _added = insert_capitalized_items_with_log(
+                        bot.clone(),
+                        msg.chat.id,
+                        &db,
+                        items,
+                        "from voice",
+                    )
+                    .await?;
                 }
             }
         }
