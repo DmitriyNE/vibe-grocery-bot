@@ -122,12 +122,10 @@ async fn process_done_callback(
     user_id: i64,
     db: &Database,
 ) -> Result<()> {
-    if let Some(session) = db.get_delete_session(user_id).await? {
-        if session.dm_message_id.map(|m| m.0) != Some(msg.id().0) {
-            return Ok(());
-        }
-        for id in &session.selected {
-            db.delete_item(session.chat_id, *id).await?;
+    if let Some(session) = load_valid_session(db, user_id, msg).await? {
+        if !session.selected.is_empty() {
+            let ids: Vec<i64> = session.selected.iter().copied().collect();
+            db.delete_items(session.chat_id, &ids).await?;
         }
         if let Some(main_list_id) = db.get_last_list_message_id(session.chat_id).await? {
             ListService::new(db)
@@ -150,10 +148,7 @@ async fn toggle_selection(
     id: i64,
     db: &Database,
 ) -> Result<()> {
-    if let Some(mut session) = db.get_delete_session(user_id).await? {
-        if session.dm_message_id.map(|m| m.0) != Some(msg.id().0) {
-            return Ok(());
-        }
+    if let Some(mut session) = load_valid_session(db, user_id, msg).await? {
         if session.selected.contains(&id) {
             session.selected.remove(&id);
         } else {
@@ -166,6 +161,20 @@ async fn toggle_selection(
         try_edit_message(bot, msg.chat().id, msg.id(), text, keyboard).await;
     }
     Ok(())
+}
+
+async fn load_valid_session(
+    db: &Database,
+    user_id: i64,
+    msg: &MaybeInaccessibleMessage,
+) -> Result<Option<crate::db::delete_session::DeleteSession>> {
+    let Some(session) = db.get_delete_session(user_id).await? else {
+        return Ok(None);
+    };
+    if session.dm_message_id.map(|m| m.0) != Some(msg.id().0) {
+        return Ok(None);
+    }
+    Ok(Some(session))
 }
 
 pub async fn enter_delete_mode(
@@ -305,5 +314,23 @@ mod tests {
         let session = db.get_delete_session(1).await.unwrap().unwrap();
         assert!(session.selected.contains(&item_id));
         server.verify().await;
+    }
+
+    #[tokio::test]
+    async fn load_valid_session_rejects_mismatched_message() {
+        let db = init_test_db().await;
+        let user = UserId(1);
+        db.init_delete_session(user.0 as i64, ChatId(1))
+            .await
+            .unwrap();
+        db.set_delete_dm_message(user.0 as i64, MessageId(5))
+            .await
+            .unwrap();
+
+        let msg_json = r#"{"message_id":6,"date":0,"chat":{"id":1,"type":"private"}}"#;
+        let msg: MaybeInaccessibleMessage = serde_json::from_str(msg_json).unwrap();
+
+        let session = load_valid_session(&db, user.0 as i64, &msg).await.unwrap();
+        assert!(session.is_none());
     }
 }
