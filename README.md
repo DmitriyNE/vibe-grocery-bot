@@ -45,6 +45,8 @@ Set these variables as needed before running:
 - `DB_URL` – optional SQLite connection string (defaults to `sqlite:items.db`)
 - `DB_POOL_SIZE` – optional maximum number of SQLite connections (defaults to `5`)
 - `DELETE_AFTER_TIMEOUT` – optional delay in seconds before temporary messages are deleted (defaults to `5`)
+- `API_BIND_ADDR` – optional bind address for the API server (defaults to `0.0.0.0:8080`)
+- `API_RATE_LIMIT_PER_SECOND` – optional request rate limit for the API (unset to disable)
 - `RUST_LOG` – optional logging level (e.g. `info` or `debug`)
 - `OPENAI_API_KEY` – optional API key for enabling voice and photo recognition (secret)
 - `OPENAI_STT_MODEL` – optional model name (`whisper-1`, `gpt-4o-mini-transcribe`, or `gpt-4o-transcribe`)
@@ -54,6 +56,40 @@ Set these variables as needed before running:
 - `OPENAI_STT_URL` – optional URL for the transcription API
 
 The database file is created automatically if needed. Embedded SQLx migrations in the `migrations/` directory are executed on startup.
+
+## API access
+
+The bot exposes a token-authenticated JSON API on `API_BIND_ADDR` (defaults to `0.0.0.0:8080`). Use it to read or mutate a chat's list from external tools.
+
+### Token workflow
+
+1. In the Telegram chat, issue a token with `/token`.
+2. Store the token securely (it is only shown once).
+3. Send API requests with `Authorization: Bearer <token>`.
+4. Use `/tokens` to list issued tokens and `/revoke_token <token>` to revoke one.
+
+Each request updates the token's last-used timestamp, and responses include an `x-request-id` header for tracing.
+
+### Endpoints
+
+- `GET /api/list` – list items
+- `POST /api/add` – add an item with `{"text":"..."}` (returns `201`)
+- `POST /api/toggle` – toggle done state with `{"id":123}`
+- `POST /api/delete` – delete an item with `{"id":123}`
+- `POST /api/done` – archive checked items
+- `POST /api/archive` – archive all items
+- `POST /api/nuke` – delete all items
+
+Example request:
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"text":"Oats"}' \
+  http://localhost:8080/api/add
+```
+
+If you need throttling, set `API_RATE_LIMIT_PER_SECOND` to a positive integer to cap requests per second.
 
 ## Running
 

@@ -16,6 +16,7 @@ pub mod tests;
 
 pub use ai::gpt::parse_items_gpt;
 pub use ai::stt::parse_items;
+pub use api::{router as api_router, ApiConfig};
 pub use commands::Command;
 pub use config::Config;
 pub use db::Item;
@@ -65,7 +66,13 @@ pub async fn run() -> Result<()> {
 
     let api_addr = config.api_bind_addr.clone();
     let api_listener = tokio::net::TcpListener::bind(&api_addr).await?;
-    let api_router = api::router(db.clone());
+    let api_config = api::ApiConfig {
+        rate_limit_per_second: config.api_rate_limit_per_second,
+    };
+    if let Some(limit) = api_config.rate_limit_per_second {
+        tracing::info!(limit, "API rate limit configured");
+    }
+    let api_router = api::router(db.clone(), api_config);
     tracing::info!(api_addr = %api_addr, "API server listening");
     tokio::spawn(async move {
         if let Err(err) = axum::serve(api_listener, api_router).await {
