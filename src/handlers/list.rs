@@ -8,35 +8,59 @@ use teloxide::{
 
 use super::list_service::ListService;
 
+struct ListFormatter;
+
+impl ListFormatter {
+    fn format_list(items: &[Item]) -> (String, InlineKeyboardMarkup) {
+        let mut text = String::new();
+        let mut keyboard_buttons = Vec::new();
+
+        let all_done = items.iter().all(|i| i.done);
+
+        for item in items {
+            let (_mark, label) = Self::format_item_entry(item, all_done);
+            text.push_str(&label);
+            text.push('\n');
+            keyboard_buttons.push(vec![InlineKeyboardButton::callback(
+                label,
+                item.id.to_string(),
+            )]);
+        }
+
+        if all_done && !items.is_empty() {
+            tracing::debug!("List fully checked out");
+        }
+
+        (text, InlineKeyboardMarkup::new(keyboard_buttons))
+    }
+
+    fn format_plain_list(items: &[Item]) -> String {
+        let mut text = String::new();
+        for item in items {
+            text.push_str(&format!("• {}\n", item.text));
+        }
+        text
+    }
+
+    fn format_item_entry(item: &Item, all_done: bool) -> (&'static str, String) {
+        let mark = if all_done {
+            "✅"
+        } else if item.done {
+            "☑️"
+        } else {
+            "⬜"
+        };
+        let label = format!("{mark} {}", item.text);
+        (mark, label)
+    }
+}
+
 pub fn format_list(items: &[Item]) -> (String, InlineKeyboardMarkup) {
-    let mut text = String::new();
-    let mut keyboard_buttons = Vec::new();
-
-    let all_done = items.iter().all(|i| i.done);
-
-    for item in items {
-        let (_mark, label) = format_item_entry(item, all_done);
-        text.push_str(&label);
-        text.push('\n');
-        keyboard_buttons.push(vec![InlineKeyboardButton::callback(
-            label,
-            item.id.to_string(),
-        )]);
-    }
-
-    if all_done && !items.is_empty() {
-        tracing::debug!("List fully checked out");
-    }
-
-    (text, InlineKeyboardMarkup::new(keyboard_buttons))
+    ListFormatter::format_list(items)
 }
 
 pub fn format_plain_list(items: &[Item]) -> String {
-    let mut text = String::new();
-    for item in items {
-        text.push_str(&format!("• {}\n", item.text));
-    }
-    text
+    ListFormatter::format_plain_list(items)
 }
 
 fn capitalize_items<I>(items: I) -> Vec<String>
@@ -49,16 +73,25 @@ where
         .collect()
 }
 
-fn format_item_entry(item: &Item, all_done: bool) -> (&'static str, String) {
-    let mark = if all_done {
-        "✅"
-    } else if item.done {
-        "☑️"
+async fn insert_items_inner(
+    bot: Bot,
+    chat_id: ChatId,
+    db: &Database,
+    items: Vec<String>,
+    context: Option<&str>,
+) -> Result<usize> {
+    let added = db.add_items_count(chat_id, &items).await? as usize;
+
+    if added > 0 {
+        tracing::debug!(chat_id = chat_id.0, added, "Inserted items");
+        ListService::new(db).send_list(bot, chat_id).await?;
+        if let Some(context) = context {
+            tracing::info!(chat_id = chat_id.0, added, context, "Added items");
+        }
     } else {
-        "⬜"
-    };
-    let label = format!("{mark} {}", item.text);
-    (mark, label)
+        tracing::debug!(chat_id = chat_id.0, "No items inserted");
+    }
+    Ok(added)
 }
 
 pub async fn insert_items<I>(bot: Bot, chat_id: ChatId, db: &Database, items: I) -> Result<usize>
@@ -66,15 +99,21 @@ where
     I: IntoIterator<Item = String>,
 {
     let items: Vec<String> = items.into_iter().collect();
-    let added = db.add_items_count(chat_id, &items).await? as usize;
+    insert_items_inner(bot, chat_id, db, items, None).await
+}
 
-    if added > 0 {
-        tracing::debug!(chat_id = chat_id.0, added, "Inserted items");
-        ListService::new(db).send_list(bot, chat_id).await?;
-    } else {
-        tracing::debug!(chat_id = chat_id.0, "No items inserted");
-    }
-    Ok(added)
+pub async fn insert_items_with_log<I>(
+    bot: Bot,
+    chat_id: ChatId,
+    db: &Database,
+    items: I,
+    context: &str,
+) -> Result<usize>
+where
+    I: IntoIterator<Item = String>,
+{
+    let items: Vec<String> = items.into_iter().collect();
+    insert_items_inner(bot, chat_id, db, items, Some(context)).await
 }
 
 pub async fn insert_capitalized_items_with_log<I>(
@@ -88,16 +127,12 @@ where
     I: IntoIterator<Item = String>,
 {
     let items = capitalize_items(items);
-    let added = insert_items(bot, chat_id, db, items).await?;
-    if added > 0 {
-        tracing::info!(chat_id = chat_id.0, added, context, "Added items");
-    }
-    Ok(added)
+    insert_items_inner(bot, chat_id, db, items, Some(context)).await
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{capitalize_items, format_item_entry};
+    use super::{capitalize_items, ListFormatter};
     use crate::db::Item;
 
     #[test]
@@ -114,7 +149,7 @@ mod tests {
             text: "Milk".to_string(),
             done: false,
         };
-        let (mark, label) = format_item_entry(&item, false);
+        let (mark, label) = ListFormatter::format_item_entry(&item, false);
         assert_eq!(mark, "⬜");
         assert_eq!(label, "⬜ Milk");
     }
@@ -126,7 +161,7 @@ mod tests {
             text: "Eggs".to_string(),
             done: true,
         };
-        let (mark, label) = format_item_entry(&item, false);
+        let (mark, label) = ListFormatter::format_item_entry(&item, false);
         assert_eq!(mark, "☑️");
         assert_eq!(label, "☑️ Eggs");
     }
@@ -138,7 +173,7 @@ mod tests {
             text: "Bread".to_string(),
             done: true,
         };
-        let (mark, label) = format_item_entry(&item, true);
+        let (mark, label) = ListFormatter::format_item_entry(&item, true);
         assert_eq!(mark, "✅");
         assert_eq!(label, "✅ Bread");
     }
