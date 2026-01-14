@@ -16,6 +16,11 @@ pub struct ListService<'a> {
     db: &'a Database,
 }
 
+enum ListRenderTarget {
+    SendNew,
+    Edit(MessageId),
+}
+
 impl<'a> ListService<'a> {
     pub fn new(db: &'a Database) -> Self {
         Self { db }
@@ -26,17 +31,13 @@ impl<'a> ListService<'a> {
             try_delete_message(&bot, chat_id, MessageId(msg_id)).await;
         }
 
-        let items = self.db.list_items(chat_id).await?;
-        if items.is_empty() {
-            let sent = bot.send_message(chat_id, LIST_EMPTY_ADD_ITEM).await?;
-            self.db
-                .update_last_list_message_id(chat_id, sent.id)
-                .await?;
-            return Ok(());
-        }
-
-        self.send_list_message(bot, chat_id, &items).await?;
-        Ok(())
+        self.render_list(
+            &bot,
+            chat_id,
+            ListRenderTarget::SendNew,
+            LIST_EMPTY_ADD_ITEM,
+        )
+        .await
     }
 
     pub async fn share_list(&self, bot: Bot, chat_id: ChatId) -> Result<()> {
@@ -56,16 +57,13 @@ impl<'a> ListService<'a> {
         chat_id: ChatId,
         message_id: MessageId,
     ) -> Result<()> {
-        let items = self.db.list_items(chat_id).await?;
-        if items.is_empty() {
-            let markup = InlineKeyboardMarkup::new(Vec::<Vec<InlineKeyboardButton>>::new());
-            try_edit_message(bot, chat_id, message_id, LIST_NOW_EMPTY, markup).await;
-            return Ok(());
-        }
-
-        let (text, keyboard) = format_list(&items);
-        try_edit_message(bot, chat_id, message_id, text, keyboard).await;
-        Ok(())
+        self.render_list(
+            bot,
+            chat_id,
+            ListRenderTarget::Edit(message_id),
+            LIST_NOW_EMPTY,
+        )
+        .await
     }
 
     pub async fn archive(&self, bot: Bot, chat_id: ChatId) -> Result<()> {
@@ -127,7 +125,7 @@ impl<'a> ListService<'a> {
 
         bot.send_message(chat_id, CHECKED_ITEMS_ARCHIVED).await?;
 
-        self.send_list_message(bot, chat_id, &remaining).await?;
+        self.send_list_message(&bot, chat_id, &remaining).await?;
         Ok(())
     }
 
@@ -171,7 +169,63 @@ impl<'a> ListService<'a> {
         Ok(Some((last_message_id, items)))
     }
 
-    async fn send_list_message(&self, bot: Bot, chat_id: ChatId, items: &[Item]) -> Result<()> {
+    async fn render_list(
+        &self,
+        bot: &Bot,
+        chat_id: ChatId,
+        target: ListRenderTarget,
+        empty_message: &str,
+    ) -> Result<()> {
+        let items = self.db.list_items(chat_id).await?;
+        if items.is_empty() {
+            self.render_empty(bot, chat_id, target, empty_message)
+                .await?;
+            return Ok(());
+        }
+
+        self.render_items(bot, chat_id, target, &items).await
+    }
+
+    async fn render_empty(
+        &self,
+        bot: &Bot,
+        chat_id: ChatId,
+        target: ListRenderTarget,
+        empty_message: &str,
+    ) -> Result<()> {
+        match target {
+            ListRenderTarget::SendNew => {
+                let sent = bot.send_message(chat_id, empty_message).await?;
+                self.db
+                    .update_last_list_message_id(chat_id, sent.id)
+                    .await?;
+            }
+            ListRenderTarget::Edit(message_id) => {
+                let markup = InlineKeyboardMarkup::new(Vec::<Vec<InlineKeyboardButton>>::new());
+                try_edit_message(bot, chat_id, message_id, empty_message, markup).await;
+            }
+        }
+        Ok(())
+    }
+
+    async fn render_items(
+        &self,
+        bot: &Bot,
+        chat_id: ChatId,
+        target: ListRenderTarget,
+        items: &[Item],
+    ) -> Result<()> {
+        match target {
+            ListRenderTarget::SendNew => self.send_list_message(bot, chat_id, items).await,
+            ListRenderTarget::Edit(message_id) => {
+                let (text, keyboard) = format_list(items);
+                try_edit_message(bot, chat_id, message_id, text, keyboard).await;
+                Ok(())
+            }
+        }
+    }
+
+    async fn send_list_message(&self, bot: &Bot, chat_id: ChatId, items: &[Item]) -> Result<()> {
         let (text, keyboard) = format_list(items);
         let sent = bot
             .send_message(chat_id, text)
