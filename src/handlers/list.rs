@@ -3,9 +3,10 @@ use crate::text_utils::capitalize_first;
 use anyhow::Result;
 use teloxide::{
     prelude::*,
-    types::{ChatId, InlineKeyboardButton, InlineKeyboardMarkup},
+    types::{ChatId, InlineKeyboardMarkup},
 };
 
+use super::keyboard::build_item_buttons;
 use super::list_service::ListService;
 
 struct ListFormatter;
@@ -13,23 +14,23 @@ struct ListFormatter;
 impl ListFormatter {
     fn format_list(items: &[Item]) -> (String, InlineKeyboardMarkup) {
         let mut text = String::new();
-        let mut keyboard_buttons = Vec::new();
-
         let all_done = items.iter().all(|i| i.done);
 
         for item in items {
             let (_mark, label) = Self::format_item_entry(item, all_done);
             text.push_str(&label);
             text.push('\n');
-            keyboard_buttons.push(vec![InlineKeyboardButton::callback(
-                label,
-                item.id.to_string(),
-            )]);
         }
 
         if all_done && !items.is_empty() {
             tracing::debug!("List fully checked out");
         }
+
+        let keyboard_buttons = build_item_buttons(
+            items,
+            |item| Self::format_item_entry(item, all_done).1,
+            |item| item.id.to_string(),
+        );
 
         (text, InlineKeyboardMarkup::new(keyboard_buttons))
     }

@@ -32,10 +32,10 @@ async fn archive_checked_archives_only_done() {
         Bot::with_client("TEST", client).set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
     let db = init_test_db().await;
     let chat = ChatId(1);
-    db.add_item(chat, "Milk").await.unwrap();
-    db.add_item(chat, "Eggs").await.unwrap();
+    db.add_item_count(chat, "Milk").await.unwrap();
+    db.add_item_count(chat, "Eggs").await.unwrap();
     let items = db.list_items(chat).await.unwrap();
-    db.toggle_item(chat, items[0].id).await.unwrap();
+    db.toggle_item_count(chat, items[0].id).await.unwrap();
     db.update_last_list_message_id(chat, MessageId(5))
         .await
         .unwrap();
@@ -69,7 +69,7 @@ async fn archive_checked_none_done() {
         Bot::with_client("TEST", client).set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
     let db = init_test_db().await;
     let chat = ChatId(1);
-    db.add_item(chat, "Milk").await.unwrap();
+    db.add_item_count(chat, "Milk").await.unwrap();
     db.update_last_list_message_id(chat, MessageId(3))
         .await
         .unwrap();

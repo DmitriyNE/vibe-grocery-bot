@@ -15,6 +15,7 @@ use crate::messages::{
     DELETE_DONE_LABEL, DELETE_SELECT_PROMPT, NO_ACTIVE_LIST_TO_EDIT,
 };
 
+use super::keyboard::build_item_buttons;
 use super::list_service::ListService;
 use crate::utils::{try_delete_message, try_edit_message};
 
@@ -24,20 +25,17 @@ pub fn format_delete_list(
 ) -> (String, InlineKeyboardMarkup) {
     let text = DELETE_SELECT_PROMPT.to_string();
 
-    let mut keyboard_buttons = Vec::new();
-
-    for item in items {
-        let button_text = if selected.contains(&item.id) {
-            format!("❌ {}", item.text)
-        } else {
-            format!("⬜ {}", item.text)
-        };
-        let callback_data = format!("delete_{}", item.id);
-        keyboard_buttons.push(vec![InlineKeyboardButton::callback(
-            button_text,
-            callback_data,
-        )]);
-    }
+    let mut keyboard_buttons = build_item_buttons(
+        items,
+        |item| {
+            if selected.contains(&item.id) {
+                format!("❌ {}", item.text)
+            } else {
+                format!("⬜ {}", item.text)
+            }
+        },
+        |item| format!("delete_{}", item.id),
+    );
 
     keyboard_buttons.push(vec![InlineKeyboardButton::callback(
         DELETE_DONE_LABEL,
@@ -125,7 +123,7 @@ async fn process_done_callback(
     if let Some(session) = load_valid_session(db, user_id, msg).await? {
         if !session.selected.is_empty() {
             let ids: Vec<i64> = session.selected.iter().copied().collect();
-            db.delete_items(session.chat_id, &ids).await?;
+            db.delete_items_count(session.chat_id, &ids).await?;
         }
         if let Some(main_list_id) = db.get_last_list_message_id(session.chat_id).await? {
             ListService::new(db)
@@ -229,7 +227,7 @@ pub async fn callback_handler(bot: Bot, q: CallbackQuery, db: Database) -> Resul
                 toggle_selection(&bot, &msg, user_id, id, &db).await?;
             }
         } else if let Ok(id) = data.parse::<i64>() {
-            db.toggle_item(msg.chat().id, id).await?;
+            db.toggle_item_count(msg.chat().id, id).await?;
             ListService::new(&db)
                 .update_message(&bot, msg.chat().id, msg.id())
                 .await?;
@@ -301,7 +299,7 @@ mod tests {
             .set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
         let db = init_test_db().await;
         let chat = ChatId(1);
-        db.add_item(chat, "Milk").await.unwrap();
+        db.add_item_count(chat, "Milk").await.unwrap();
         let items = db.list_items(chat).await.unwrap();
         let item_id = items[0].id;
 

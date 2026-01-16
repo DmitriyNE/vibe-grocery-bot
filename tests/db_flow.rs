@@ -7,23 +7,23 @@ async fn basic_item_flow() -> Result<()> {
     let db = init_test_db().await;
     let chat = ChatId(42);
 
-    db.add_item(chat, "Apples").await?;
-    db.add_item(chat, "Milk").await?;
+    db.add_item_count(chat, "Apples").await?;
+    db.add_item_count(chat, "Milk").await?;
 
     let mut items = db.list_items(chat).await?;
     assert_eq!(items.len(), 2);
     assert_eq!(items[0].text, "Apples");
     assert!(!items[0].done);
 
-    db.toggle_item(chat, items[0].id).await?;
+    db.toggle_item_count(chat, items[0].id).await?;
     items = db.list_items(chat).await?;
     assert!(items[0].done);
 
-    db.delete_item(chat, items[1].id).await?;
+    db.delete_item_count(chat, items[1].id).await?;
     items = db.list_items(chat).await?;
     assert_eq!(items.len(), 1);
 
-    db.delete_all_items(chat).await?;
+    db.delete_all_items_count(chat).await?;
     items = db.list_items(chat).await?;
     assert!(items.is_empty());
 
@@ -51,13 +51,13 @@ async fn delete_multiple_items() -> Result<()> {
     let db = init_test_db().await;
     let chat = ChatId(2);
     for i in 0..3 {
-        db.add_item(chat, &format!("Item {i}")).await?;
+        db.add_item_count(chat, &format!("Item {i}")).await?;
     }
 
     let items = db.list_items(chat).await?;
     let ids: Vec<i64> = items.iter().map(|i| i.id).collect();
 
-    db.delete_items(chat, &ids).await?;
+    db.delete_items_count(chat, &ids).await?;
 
     let remaining = db.list_items(chat).await?;
     assert!(remaining.is_empty());

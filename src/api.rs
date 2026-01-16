@@ -590,7 +590,7 @@ mod tests {
         db.create_token(chat_id, "token-123", None, None, None, 1)
             .await
             .unwrap();
-        db.add_item(chat_id, "Milk").await.unwrap();
+        db.add_item_count(chat_id, "Milk").await.unwrap();
 
         let app = router(
             db.clone(),
@@ -704,10 +704,10 @@ mod tests {
         db.create_token(chat_id, "token-done", None, None, None, 1)
             .await
             .unwrap();
-        db.add_item(chat_id, "Tea").await.unwrap();
-        db.add_item(chat_id, "Sugar").await.unwrap();
+        db.add_item_count(chat_id, "Tea").await.unwrap();
+        db.add_item_count(chat_id, "Sugar").await.unwrap();
         let items = db.list_items(chat_id).await.unwrap();
-        db.toggle_item(chat_id, items[0].id).await.unwrap();
+        db.toggle_item_count(chat_id, items[0].id).await.unwrap();
 
         let app = router(
             db.clone(),
@@ -741,7 +741,7 @@ mod tests {
         db.create_token(chat_id, "token-archive", None, None, None, 1)
             .await
             .unwrap();
-        db.add_item(chat_id, "Bread").await.unwrap();
+        db.add_item_count(chat_id, "Bread").await.unwrap();
         let app = router(
             db.clone(),
             ApiConfig {
@@ -764,7 +764,7 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
         assert!(db.list_items(chat_id).await.unwrap().is_empty());
 
-        db.add_item(chat_id, "Butter").await.unwrap();
+        db.add_item_count(chat_id, "Butter").await.unwrap();
         let response = app
             .oneshot(
                 Request::builder()
