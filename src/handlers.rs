@@ -1,7 +1,9 @@
 pub mod delete;
 pub mod info;
+pub mod keyboard;
 pub mod list;
 pub mod list_service;
+pub mod parse;
 pub mod photo;
 pub mod text;
 pub mod tokens;

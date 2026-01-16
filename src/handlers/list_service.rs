@@ -41,11 +41,9 @@ impl<'a> ListService<'a> {
     }
 
     pub async fn share_list(&self, bot: Bot, chat_id: ChatId) -> Result<()> {
-        let items = self.db.list_items(chat_id).await?;
-        if items.is_empty() {
-            bot.send_message(chat_id, LIST_EMPTY).await?;
+        let Some(items) = self.load_items_or_notify(&bot, chat_id, LIST_EMPTY).await? else {
             return Ok(());
-        }
+        };
         let text = format_plain_list(&items);
         bot.send_message(chat_id, text).await?;
         Ok(())
@@ -80,7 +78,7 @@ impl<'a> ListService<'a> {
         try_delete_message(&bot, chat_id, last_message_id).await;
         bot.send_message(chat_id, archived_text).await?;
 
-        self.db.delete_all_items(chat_id).await?;
+        self.db.delete_all_items_count(chat_id).await?;
         self.db.clear_last_list_message_id(chat_id).await?;
 
         bot.send_message(chat_id, LIST_ARCHIVED).await?;
@@ -121,7 +119,7 @@ impl<'a> ListService<'a> {
         bot.send_message(chat_id, archived_text).await?;
 
         let ids: Vec<i64> = done.iter().map(|i| i.id).collect();
-        self.db.delete_items(chat_id, &ids).await?;
+        self.db.delete_items_count(chat_id, &ids).await?;
 
         bot.send_message(chat_id, CHECKED_ITEMS_ARCHIVED).await?;
 
@@ -134,7 +132,7 @@ impl<'a> ListService<'a> {
         if let Some(list_message_id) = self.db.get_last_list_message_id(msg.chat.id).await? {
             try_delete_message(&bot, msg.chat.id, MessageId(list_message_id)).await;
         }
-        self.db.delete_all_items(msg.chat.id).await?;
+        self.db.delete_all_items_count(msg.chat.id).await?;
         self.db.clear_last_list_message_id(msg.chat.id).await?;
         let confirmation = bot.send_message(msg.chat.id, LIST_NUKED).await?;
         drop(crate::delete_after(
@@ -160,11 +158,12 @@ impl<'a> ListService<'a> {
             }
         };
 
-        let items = self.db.list_items(chat_id).await?;
-        if items.is_empty() {
-            bot.send_message(chat_id, empty_message).await?;
+        let Some(items) = self
+            .load_items_or_notify(bot, chat_id, empty_message)
+            .await?
+        else {
             return Ok(None);
-        }
+        };
 
         Ok(Some((last_message_id, items)))
     }
@@ -235,5 +234,19 @@ impl<'a> ListService<'a> {
             .update_last_list_message_id(chat_id, sent.id)
             .await?;
         Ok(())
+    }
+
+    async fn load_items_or_notify(
+        &self,
+        bot: &Bot,
+        chat_id: ChatId,
+        empty_message: &str,
+    ) -> Result<Option<Vec<Item>>> {
+        let items = self.db.list_items(chat_id).await?;
+        if items.is_empty() {
+            bot.send_message(chat_id, empty_message).await?;
+            return Ok(None);
+        }
+        Ok(Some(items))
     }
 }

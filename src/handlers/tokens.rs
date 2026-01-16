@@ -28,13 +28,7 @@ fn token_preview(token: &str) -> String {
     token.chars().take(6).collect()
 }
 
-fn format_timestamp(timestamp: i64) -> String {
-    chrono::DateTime::<chrono::Utc>::from_timestamp(timestamp, 0)
-        .map(|dt| dt.to_rfc3339())
-        .unwrap_or_else(|| "unknown".to_string())
-}
-
-fn format_optional_timestamp(timestamp: Option<i64>, fallback: &str) -> String {
+fn format_timestamp(timestamp: Option<i64>, fallback: &str) -> String {
     timestamp
         .and_then(|value| chrono::DateTime::<chrono::Utc>::from_timestamp(value, 0))
         .map(|dt| dt.to_rfc3339())
@@ -44,9 +38,9 @@ fn format_optional_timestamp(timestamp: Option<i64>, fallback: &str) -> String {
 fn format_token_list(tokens: &[TokenRecord]) -> String {
     let mut lines = Vec::new();
     for token in tokens {
-        let issued = format_timestamp(token.issued_at);
-        let last_used = format_optional_timestamp(token.last_used_at, "never");
-        let revoked = format_optional_timestamp(token.revoked_at, "not revoked");
+        let issued = format_timestamp(Some(token.issued_at), "unknown");
+        let last_used = format_timestamp(token.last_used_at, "never");
+        let revoked = format_timestamp(token.revoked_at, "not revoked");
         let name = token
             .name
             .as_deref()
