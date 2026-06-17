@@ -1,0 +1,3 @@
+ALTER TABLE tokens ADD COLUMN name TEXT;
+ALTER TABLE tokens ADD COLUMN issuer_user_id INTEGER;
+ALTER TABLE tokens ADD COLUMN issuer_name TEXT;

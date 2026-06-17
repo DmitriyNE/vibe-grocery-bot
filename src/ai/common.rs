@@ -38,6 +38,24 @@ struct ItemsJson {
 
 pub const OPENAI_CHAT_URL: &str = "https://api.openai.com/v1/chat/completions";
 
+fn is_loopback_host(host: &str) -> bool {
+    matches!(host, "localhost" | "127.0.0.1" | "::1")
+}
+
+pub(crate) fn client_for_url(url: &str) -> Result<reqwest::Client> {
+    let use_no_proxy = reqwest::Url::parse(url)
+        .ok()
+        .and_then(|parsed| parsed.host_str().map(is_loopback_host))
+        .unwrap_or(false);
+    let builder = reqwest::Client::builder();
+    let builder = if use_no_proxy {
+        builder.no_proxy()
+    } else {
+        builder
+    };
+    Ok(builder.build()?)
+}
+
 /// Build a chat completion request body for text input.
 pub fn build_text_chat_body(
     model: &str,
@@ -106,7 +124,7 @@ pub async fn request_items(
 ) -> Result<Vec<String>> {
     debug!(url, "sending chat completion request");
 
-    let client = reqwest::Client::new();
+    let client = client_for_url(url)?;
     let builder = client.post(url).json(body);
     let resp = send_openai_request(api_key, builder).await?;
 

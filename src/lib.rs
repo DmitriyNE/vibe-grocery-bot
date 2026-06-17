@@ -2,6 +2,8 @@ use anyhow::Result;
 use teloxide::prelude::*;
 
 pub mod ai;
+mod api;
+mod command_handler;
 mod commands;
 mod config;
 pub mod db;
@@ -15,13 +17,15 @@ pub mod tests;
 
 pub use ai::gpt::parse_items_gpt;
 pub use ai::stt::parse_items;
+pub use api::{router as api_router, ApiConfig};
+use command_handler::handle_command;
 pub use commands::Command;
 pub use config::Config;
 pub use db::Item;
 pub use handlers::{
     add_items_from_parsed_text, add_items_from_photo, add_items_from_text, add_items_from_voice,
     callback_handler, enter_delete_mode, format_delete_list, format_list, format_plain_list, help,
-    insert_items, show_system_info, ListService,
+    insert_items, issue_token, list_tokens, revoke_token, show_system_info, ListService,
 };
 pub use messages::*;
 pub use system_info::get_system_info;
@@ -62,6 +66,22 @@ pub async fn run() -> Result<()> {
 
     sqlx::migrate!("./migrations").run(&*db).await?;
 
+    let api_addr = config.api_bind_addr.clone();
+    let api_listener = tokio::net::TcpListener::bind(&api_addr).await?;
+    let api_config = api::ApiConfig {
+        rate_limit_per_second: config.api_rate_limit_per_second,
+    };
+    if let Some(limit) = api_config.rate_limit_per_second {
+        tracing::info!(limit, "API rate limit configured");
+    }
+    let api_router = api::router(db.clone(), api_config);
+    tracing::info!(api_addr = %api_addr, "API server listening");
+    tokio::spawn(async move {
+        if let Err(err) = axum::serve(api_listener, api_router).await {
+            tracing::error!(error = %err, "API server stopped");
+        }
+    });
+
     // --- Command Enum ---
     // defined in the commands module
 
@@ -87,25 +107,7 @@ pub async fn run() -> Result<()> {
                      db: db::Database,
                      ai_config: Option<crate::ai::config::AiConfig>,
                      delete_after_timeout: u64| async move {
-                        let service = ListService::new(&db);
-                        match cmd {
-                            Command::Start | Command::Help => help(bot, msg).await?,
-                            Command::List => service.send_list(bot, msg.chat.id).await?,
-                            Command::Archive => service.archive(bot, msg.chat.id).await?,
-                            Command::ArchiveDone => {
-                                service.archive_checked(bot, msg.chat.id).await?
-                            }
-                            Command::Delete => {
-                                enter_delete_mode(bot, msg, &db, delete_after_timeout).await?
-                            }
-                            Command::Share => service.share_list(bot, msg.chat.id).await?,
-                            Command::Nuke => service.nuke(bot, msg, delete_after_timeout).await?,
-                            Command::Parse => {
-                                add_items_from_parsed_text(bot, msg, db, ai_config).await?
-                            }
-                            Command::Info => show_system_info(bot, msg).await?,
-                        }
-                        Ok(())
+                        handle_command(bot, msg, cmd, db, ai_config, delete_after_timeout).await
                     },
                 ))
                 .branch(dptree::endpoint(add_items_from_text)),

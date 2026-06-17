@@ -14,7 +14,7 @@ pub fn parse_item_line(line: &str) -> Option<String> {
     }
 
     let cleaned = line
-        .trim_start_matches(['☑', '✅', '⬜', '🛒', '•', '🗑', '\u{fe0f}'])
+        .trim_start_matches(['☑', '✅', '⬜', '🛒', '•', '🗑', '\u{fe0f}', '-', '*'])
         .trim();
 
     if cleaned.starts_with("Removed via voice request") {
@@ -84,5 +84,11 @@ mod tests {
     #[test]
     fn parse_item_line_trims_and_returns_text() {
         assert_eq!(parse_item_line("✅ Milk  "), Some("Milk".to_string()));
+    }
+
+    #[test]
+    fn parse_item_line_trims_markdown_bullets() {
+        assert_eq!(parse_item_line("- Milk"), Some("Milk".to_string()));
+        assert_eq!(parse_item_line("* Milk"), Some("Milk".to_string()));
     }
 }

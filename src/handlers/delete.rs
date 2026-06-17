@@ -15,6 +15,7 @@ use crate::messages::{
     DELETE_DONE_LABEL, DELETE_SELECT_PROMPT, NO_ACTIVE_LIST_TO_EDIT,
 };
 
+use super::keyboard::build_item_buttons;
 use super::list_service::ListService;
 use crate::utils::{try_delete_message, try_edit_message};
 
@@ -24,20 +25,17 @@ pub fn format_delete_list(
 ) -> (String, InlineKeyboardMarkup) {
     let text = DELETE_SELECT_PROMPT.to_string();
 
-    let mut keyboard_buttons = Vec::new();
-
-    for item in items {
-        let button_text = if selected.contains(&item.id) {
-            format!("❌ {}", item.text)
-        } else {
-            format!("⬜ {}", item.text)
-        };
-        let callback_data = format!("delete_{}", item.id);
-        keyboard_buttons.push(vec![InlineKeyboardButton::callback(
-            button_text,
-            callback_data,
-        )]);
-    }
+    let mut keyboard_buttons = build_item_buttons(
+        items,
+        |item| {
+            if selected.contains(&item.id) {
+                format!("❌ {}", item.text)
+            } else {
+                format!("⬜ {}", item.text)
+            }
+        },
+        |item| format!("delete_{}", item.id),
+    );
 
     keyboard_buttons.push(vec![InlineKeyboardButton::callback(
         DELETE_DONE_LABEL,
@@ -122,12 +120,10 @@ async fn process_done_callback(
     user_id: i64,
     db: &Database,
 ) -> Result<()> {
-    if let Some(session) = db.get_delete_session(user_id).await? {
-        if session.dm_message_id.map(|m| m.0) != Some(msg.id().0) {
-            return Ok(());
-        }
-        for id in &session.selected {
-            db.delete_item(session.chat_id, *id).await?;
+    if let Some(session) = load_valid_session(db, user_id, msg).await? {
+        if !session.selected.is_empty() {
+            let ids: Vec<i64> = session.selected.iter().copied().collect();
+            db.delete_items_count(session.chat_id, &ids).await?;
         }
         if let Some(main_list_id) = db.get_last_list_message_id(session.chat_id).await? {
             ListService::new(db)
@@ -150,10 +146,7 @@ async fn toggle_selection(
     id: i64,
     db: &Database,
 ) -> Result<()> {
-    if let Some(mut session) = db.get_delete_session(user_id).await? {
-        if session.dm_message_id.map(|m| m.0) != Some(msg.id().0) {
-            return Ok(());
-        }
+    if let Some(mut session) = load_valid_session(db, user_id, msg).await? {
         if session.selected.contains(&id) {
             session.selected.remove(&id);
         } else {
@@ -166,6 +159,20 @@ async fn toggle_selection(
         try_edit_message(bot, msg.chat().id, msg.id(), text, keyboard).await;
     }
     Ok(())
+}
+
+async fn load_valid_session(
+    db: &Database,
+    user_id: i64,
+    msg: &MaybeInaccessibleMessage,
+) -> Result<Option<crate::db::delete_session::DeleteSession>> {
+    let Some(session) = db.get_delete_session(user_id).await? else {
+        return Ok(None);
+    };
+    if session.dm_message_id.map(|m| m.0) != Some(msg.id().0) {
+        return Ok(None);
+    }
+    Ok(Some(session))
 }
 
 pub async fn enter_delete_mode(
@@ -220,7 +227,7 @@ pub async fn callback_handler(bot: Bot, q: CallbackQuery, db: Database) -> Resul
                 toggle_selection(&bot, &msg, user_id, id, &db).await?;
             }
         } else if let Ok(id) = data.parse::<i64>() {
-            db.toggle_item(msg.chat().id, id).await?;
+            db.toggle_item_count(msg.chat().id, id).await?;
             ListService::new(&db)
                 .update_message(&bot, msg.chat().id, msg.id())
                 .await?;
@@ -235,9 +242,10 @@ pub async fn callback_handler(bot: Bot, q: CallbackQuery, db: Database) -> Resul
 mod tests {
     use super::*;
     use crate::tests::util::init_test_db;
+    use reqwest::Client;
     use teloxide::types::{ChatId, MaybeInaccessibleMessage, MessageId, UserId};
     use wiremock::{
-        matchers::{method, path},
+        matchers::{method, path, path_regex},
         Mock, MockServer, ResponseTemplate,
     };
 
@@ -245,7 +253,7 @@ mod tests {
     async fn cleanup_previous_session_deletes_messages() {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
-            .and(path("/botTEST/DeleteMessage"))
+            .and(path_regex(r"^/botTEST/[Dd]eleteMessage$"))
             .respond_with(
                 ResponseTemplate::new(200)
                     .set_body_raw(r#"{"ok":true,"result":true}"#, "application/json"),
@@ -254,7 +262,9 @@ mod tests {
             .mount(&server)
             .await;
 
-        let bot = Bot::new("TEST").set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
+        let client = Client::builder().no_proxy().build().unwrap();
+        let bot = Bot::with_client("TEST", client)
+            .set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
         let db = init_test_db().await;
         let user = UserId(1);
         db.init_delete_session(user.0 as i64, ChatId(1))
@@ -284,10 +294,12 @@ mod tests {
             .mount(&server)
             .await;
 
-        let bot = Bot::new("TEST").set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
+        let client = Client::builder().no_proxy().build().unwrap();
+        let bot = Bot::with_client("TEST", client)
+            .set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
         let db = init_test_db().await;
         let chat = ChatId(1);
-        db.add_item(chat, "Milk").await.unwrap();
+        db.add_item_count(chat, "Milk").await.unwrap();
         let items = db.list_items(chat).await.unwrap();
         let item_id = items[0].id;
 
@@ -300,5 +312,23 @@ mod tests {
         let session = db.get_delete_session(1).await.unwrap().unwrap();
         assert!(session.selected.contains(&item_id));
         server.verify().await;
+    }
+
+    #[tokio::test]
+    async fn load_valid_session_rejects_mismatched_message() {
+        let db = init_test_db().await;
+        let user = UserId(1);
+        db.init_delete_session(user.0 as i64, ChatId(1))
+            .await
+            .unwrap();
+        db.set_delete_dm_message(user.0 as i64, MessageId(5))
+            .await
+            .unwrap();
+
+        let msg_json = r#"{"message_id":6,"date":0,"chat":{"id":1,"type":"private"}}"#;
+        let msg: MaybeInaccessibleMessage = serde_json::from_str(msg_json).unwrap();
+
+        let session = load_valid_session(&db, user.0 as i64, &msg).await.unwrap();
+        assert!(session.is_none());
     }
 }

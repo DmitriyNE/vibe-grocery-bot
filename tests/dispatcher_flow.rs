@@ -1,3 +1,4 @@
+use reqwest::Client;
 use shopbot::tests::util::init_test_db;
 use shopbot::ListService;
 use teloxide::{prelude::*, utils::command::BotCommands};
@@ -31,7 +32,9 @@ async fn dispatcher_add_then_list() {
         .mount(&server)
         .await;
 
-    let bot = Bot::new("TEST").set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
+    let client = Client::builder().no_proxy().build().unwrap();
+    let bot =
+        Bot::with_client("TEST", client).set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
     let db = init_test_db().await;
     let ai_config: Option<shopbot::ai::config::AiConfig> = None;
     let delete_after_timeout = 5u64;

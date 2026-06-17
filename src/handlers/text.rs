@@ -4,11 +4,11 @@ use teloxide::prelude::*;
 
 use crate::ai::config::AiConfig;
 use crate::ai::gpt::parse_items_gpt;
-use crate::ai::stt::parse_items;
 use crate::messages::{GPT_PARSING_DISABLED, HELP_TEXT};
-use crate::text_utils::{capitalize_first, parse_item_line};
+use crate::text_utils::parse_item_line;
 
-use super::list::insert_items;
+use super::list::{insert_capitalized_items_with_log, insert_items_with_log};
+use super::parse::parse_items_with_fallback;
 
 pub async fn help(bot: Bot, msg: Message) -> Result<()> {
     bot.send_message(msg.chat.id, HELP_TEXT)
@@ -18,14 +18,12 @@ pub async fn help(bot: Bot, msg: Message) -> Result<()> {
 }
 
 pub async fn add_items_from_text(bot: Bot, msg: Message, db: Database) -> Result<()> {
-    if let Some(text) = msg.text() {
-        let items: Vec<String> = text.lines().filter_map(parse_item_line).collect();
+    let Some(text) = msg.text() else {
+        return Ok(());
+    };
+    let items: Vec<String> = text.lines().filter_map(parse_item_line).collect();
 
-        let added = insert_items(bot, msg.chat.id, &db, items).await?;
-        if added > 0 {
-            tracing::info!("Added {} item(s) for chat {}", added, msg.chat.id);
-        }
-    }
+    let _added = insert_items_with_log(bot, msg.chat.id, &db, items, "via text message").await?;
     Ok(())
 }
 
@@ -44,30 +42,20 @@ pub async fn add_items_from_parsed_text(
         return Ok(());
     };
 
-    let items = match parse_items_gpt(
-        &config.api_key,
-        &config.gpt_model,
+    let items = parse_items_with_fallback(
         text,
-        config.openai_chat_url.as_deref(),
-    )
-    .await
-    {
-        Ok(list) => list,
-        Err(err) => {
-            tracing::warn!("gpt parsing failed: {}", err);
-            parse_items(text)
-        }
-    };
+        parse_items_gpt(
+            &config.api_key,
+            &config.gpt_model,
+            text,
+            config.openai_chat_url.as_deref(),
+        )
+        .await,
+        "gpt_parse",
+    );
 
-    let items: Vec<String> = items.into_iter().map(|i| capitalize_first(&i)).collect();
-    let added = insert_items(bot, msg.chat.id, &db, items).await?;
-    if added > 0 {
-        tracing::info!(
-            "Added {} item(s) via /parse for chat {}",
-            added,
-            msg.chat.id
-        );
-    }
+    let _added =
+        insert_capitalized_items_with_log(bot, msg.chat.id, &db, items, "via /parse").await?;
 
     Ok(())
 }

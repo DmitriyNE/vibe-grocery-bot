@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 
 ## Unreleased
+1. Add token issuance, listing, and revocation commands per chat.
+2. Add a token-authenticated API endpoint for fetching list items.
+3. Add token-authenticated API endpoints for list mutations (add, toggle, delete, archive, nuke, done).
+4. Add configurable API rate limiting and request ID headers.
+5. Add structured API logging with request IDs and token identifiers.
+6. Document API usage and token workflow in the README.
+7. Parse leading "-" and "*" markdown bullets when extracting items from text.
+8. Add optional token names, store token issuer IDs and names, and rename the token command to `/create_token`.
 
 ## [0.4.0] - 2025-06-22
 1. Add index on `items.chat_id` to speed up queries.
@@ -49,4 +57,3 @@ All notable changes to this project will be documented in this file.
 9. `/parse` uses GPT to parse a message into items.
 10. Optional voice message parsing via OpenAI speech-to-text.
 11. Configurable speech model via `OPENAI_STT_MODEL` in `fly.toml`.
-

@@ -26,5 +26,12 @@ pub async fn init_test_db() -> Database {
     .await
     .unwrap();
 
+    sqlx::query(
+        "CREATE TABLE tokens(\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    chat_id INTEGER NOT NULL,\n    token TEXT NOT NULL,\n    name TEXT,\n    issuer_user_id INTEGER,\n    issuer_name TEXT,\n    issued_at INTEGER NOT NULL,\n    last_used_at INTEGER,\n    revoked_at INTEGER\n)"
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
     Database::new(pool)
 }

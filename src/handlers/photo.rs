@@ -3,11 +3,9 @@ use crate::utils::download_telegram_file;
 use anyhow::Result;
 use teloxide::prelude::*;
 
-use crate::ai::vision::parse_photo_items;
-use crate::text_utils::capitalize_first;
-
-use super::list::insert_items;
+use super::list::insert_capitalized_items_with_log;
 use crate::ai::config::AiConfig;
+use crate::ai::vision::parse_photo_items;
 
 pub async fn add_items_from_photo(
     bot: Bot,
@@ -50,15 +48,8 @@ pub async fn add_items_from_photo(
         }
     };
 
-    let items: Vec<String> = items.into_iter().map(|i| capitalize_first(&i)).collect();
-    let added = insert_items(bot, msg.chat.id, &db, items).await?;
-    if added > 0 {
-        tracing::info!(
-            "Added {} item(s) from photo for chat {}",
-            added,
-            msg.chat.id
-        );
-    }
+    let _added =
+        insert_capitalized_items_with_log(bot, msg.chat.id, &db, items, "from photo").await?;
 
     Ok(())
 }

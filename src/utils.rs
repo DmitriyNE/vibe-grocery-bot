@@ -100,9 +100,10 @@ pub async fn download_telegram_file(bot: &Bot, file_id: &str) -> Result<Vec<u8>>
 mod tests {
     use super::*;
     use anyhow::Result;
+    use reqwest::Client;
     use teloxide::{types::InlineKeyboardButton, RequestError};
     use wiremock::{
-        matchers::{method, path},
+        matchers::{method, path, path_regex},
         Mock, MockServer, ResponseTemplate,
     };
 
@@ -110,7 +111,7 @@ mod tests {
     async fn try_delete_message_sends_request() -> Result<(), RequestError> {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
-            .and(path("/botTEST/DeleteMessage"))
+            .and(path_regex(r"^/botTEST/[Dd]eleteMessage$"))
             .respond_with(
                 ResponseTemplate::new(200)
                     .set_body_raw(r#"{"ok":true,"result":true}"#, "application/json"),
@@ -119,7 +120,9 @@ mod tests {
             .mount(&server)
             .await;
 
-        let bot = Bot::new("TEST").set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
+        let client = Client::builder().no_proxy().build().unwrap();
+        let bot = Bot::with_client("TEST", client)
+            .set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
         try_delete_message(&bot, ChatId(1), MessageId(2)).await;
         server.verify().await;
         Ok(())
@@ -138,7 +141,9 @@ mod tests {
             .mount(&server)
             .await;
 
-        let bot = Bot::new("TEST").set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
+        let client = Client::builder().no_proxy().build().unwrap();
+        let bot = Bot::with_client("TEST", client)
+            .set_api_url(reqwest::Url::parse(&server.uri()).unwrap());
         let markup = InlineKeyboardMarkup::new(Vec::<Vec<InlineKeyboardButton>>::new());
         try_edit_message(&bot, ChatId(1), MessageId(2), "hi", markup).await;
         server.verify().await;
@@ -166,7 +171,8 @@ mod tests {
             .await;
 
         let url = reqwest::Url::parse(&server.uri()).unwrap();
-        let bot = Bot::new("TEST").set_api_url(url);
+        let client = Client::builder().no_proxy().build().unwrap();
+        let bot = Bot::with_client("TEST", client).set_api_url(url);
         let bytes = download_telegram_file(&bot, "f").await?;
         assert_eq!(bytes, b"hi");
         server.verify().await;
