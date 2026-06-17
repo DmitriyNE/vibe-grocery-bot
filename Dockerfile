@@ -1,7 +1,7 @@
 # Stage 1: Build Planner
 # This stage calculates the dependency graph and produces a recipe file.
 # It's small and fast, and only needs to be re-run when Cargo.toml changes.
-FROM rust:1.87-slim AS planner
+FROM rust:1.96-slim AS planner
 WORKDIR /app
 RUN cargo install cargo-chef
 COPY . .
@@ -10,7 +10,7 @@ RUN cargo chef prepare --recipe-path recipe.json
 # Stage 2: Dependency Cacher
 # This stage builds only the dependencies, using the recipe from the planner.
 # The result is cached by Docker and re-used as long as the recipe doesn't change.
-FROM rust:1.87-slim AS cacher
+FROM rust:1.96-slim AS cacher
 WORKDIR /app
 # Install system dependencies required for building crates like `openssl-sys`
 RUN apt-get update -qq && apt-get install -y --no-install-recommends git pkg-config libssl-dev
